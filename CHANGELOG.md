@@ -18,3 +18,7 @@ localhost:15672 in your web browser.
 
 ### Removed
 - Unused variable.
+=======
+## [1.0.1]
+### Changed
+- Template for M2 now also enables xdebugging of composer. 
