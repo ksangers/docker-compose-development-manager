@@ -24,6 +24,7 @@ localhost:15672 in your web browser.
 - Template for M2 now also enables xdebugging of composer. 
 =======
 - Template for M2 now also enables xdebug of composer.
+- Updated the version of the template.
 
 ### Removed
 - Unused variable.
