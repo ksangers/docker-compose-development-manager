@@ -24,7 +24,9 @@ localhost:15672 in your web browser.
 - Template for M2 now also enables xdebugging of composer. 
 =======
 - Template for M2 now also enables xdebug of composer.
-- Updated the version of the template.
+- Updated the version of the template for M2 template.
+- Changed mysql from 5.6 to 5.7 for M1 template.
+- Changed php from 7.2 to 7.3.
 
 ### Removed
 - Unused variable.
