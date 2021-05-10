@@ -217,6 +217,9 @@ run() {
       if [ -n "${COMPOSE_VAR_x_custom_type}" ]; then
         local latestFilePath
         latestFilePath="${APP_SELF_PATH}/templates/${COMPOSE_VAR_x_custom_type}/docker-compose.yml"
+        if [ ! -f $latestFilePath ]; then
+          return 0
+        fi
         eval "$(parse_yaml $latestFilePath "COMPOSE_LATEST_VAR_")" &> /dev/null
         if  [ -n "${COMPOSE_VAR_x_custom_version}" ] || [ -n "${COMPOSE_LATEST_VAR_x_custom_version}" ] && [ "${COMPOSE_LATEST_VAR_x_custom_version}" != "${COMPOSE_VAR_x_custom_version}" ]; then
           echo "The current docker template is outdated, please run \"dev init ${COMPOSE_VAR_x_custom_type} -f\" to update it."
