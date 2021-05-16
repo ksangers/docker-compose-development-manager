@@ -599,12 +599,6 @@ run() {
       $DC -f "${TRAEFIK_LOCATION}/docker-compose.yml" down
       grep -xFv "${TRAEFIK_LOCATION}" "${CACHE_DIR}/active_environments" > "${CACHE_DIR}/new_active_environments"
       mv "${CACHE_DIR}/new_active_environments" "${CACHE_DIR}/active_environments"
-
-      # Remove the gateway network if it is still running
-      if [ "$(docker network list --filter "name=gateway" --format "{{.Name}}")" == "gateway" ]; then
-        echo "Shutting down gateway network..."
-        docker network rm gateway &> /dev/null
-      fi
     fi
   }
 
