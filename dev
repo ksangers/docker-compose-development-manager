@@ -555,7 +555,7 @@ run() {
       if [[ $top_output == '' ]]; then
         echo "Restoring ${location}"
         $DC -f "${location}/docker-compose.yml" up -d
-        if grep -q "dev_domain=" "docker-compose.yml"; then
+        if grep -q "dev_domain=" "docker-compose.yml" "docker-compose.yaml" 2> /dev/null; then
           publish_hosts
         fi
       fi
@@ -612,7 +612,7 @@ run() {
   up() {
     autoupdate
     restore
-    if grep -q "traefik.enable=true" "docker-compose.yml"; then
+    if grep -q "traefik.enable=true" "docker-compose.yml" "docker-compose.yaml" 2> /dev/null; then
       start_traefik
     fi
 
@@ -627,7 +627,7 @@ run() {
       pwd >> "${CACHE_DIR}/active_environments"
     fi
 
-    if grep -q "dev_domain=" "docker-compose.yml"; then
+    if grep -q "dev_domain=" "docker-compose.yml" "docker-compose.yaml" 2> /dev/null; then
       publish_hosts
     fi
 
