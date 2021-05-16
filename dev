@@ -576,9 +576,8 @@ run() {
 
   # Start the Traefik proxy
   start_traefik() {
-    # Create the gateway network if it is not yet running
-    if [ "$(docker network list --filter "name=gateway" --format "{{.Name}}")" != "gateway" ]; then
-      echo "Setting up gateway network..."
+    # Create the gateway network if it is not yet available
+    if docker network list --format "{{.Name}}" | grep -xcq gateway; then
       docker network create \
         --driver=bridge \
         --attachable \
