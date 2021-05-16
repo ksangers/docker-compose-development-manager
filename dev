@@ -57,12 +57,12 @@ load_env() {
   export GID
   export UID
   if [[ "${MACHINE}" == "windows" ]]; then
-    DC="winpty docker-compose"
+    DC="winpty docker-compose --log-level ERROR"
     CUID="1000"
     CGID="1000"
     CHOME="/home/app"
   else
-    DC="docker-compose"
+    DC="docker-compose --log-level ERROR"
     CUID="${UID}"
     CGID="${GID}"
     CHOME="${HOME}"
