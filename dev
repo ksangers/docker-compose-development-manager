@@ -140,7 +140,7 @@ run() {
   APP_PROJECT=$(basename "${APP_SELF_PATH}")
   TRAEFIK_LOCATION="$(realpath "$(dirname "$(realpath "$0" )")/traefik")"
 
-  # Turn on and attach to specified container
+  # Start and attach to a service container its output
   attach() {
     $DC up "$1"
     return $?
@@ -280,7 +280,7 @@ run() {
   # Get help for commands
   help() {
     attach() {
-      echo "Attach to a service container."
+      echo "Start and attach to a service container its output"
       echo "Usage: $0 attach <container-name>"
       return 0
     }
@@ -329,7 +329,7 @@ run() {
     }
 
     ps() {
-      echo "Display container status for current project"
+      echo "Display status of service containers"
       echo "Usage: $0 ps"
       echo "For more info, see: docker-compose help ps"
       return 0
@@ -380,23 +380,31 @@ run() {
       return $?
     else
       echo "Usage: $0 <option>"
-      echo "The following options are available"
-      echo "  attach: Attach to a service container"
-      echo "  build: Build the services of the Docker Compose configuration"
-      echo "  check: Check if current template is up-to-date"
-      echo "  dc: Execute a Docker Compose command"
-      echo "  down: Stop the environment"
-      echo "  exec: Execute a command on a running service container"
-      echo "  help: display additional information about a command"
-      echo "  init: Initialize a project based on a template"
-      echo "  logs: Display container output logs"
-      echo "  ps: Display container status"
-      echo "  pull: Pull latest images"
+      echo "The following options are available."
+      echo
+      echo "General management"
+      echo "  build:   Build the services of the Docker Compose configuration"
+      echo "  down:    Stop the environment"
+      echo "  ps:      Display status of service containers"
+      echo "  pull:    Pull latest images of service containers"
+      echo "  up:      Start the environment"
+      echo
+      echo "Service container interaction"
+      echo "  attach: Start and attach to a service container its output"
+      echo "  exec:   Execute a command on a running service container"
+      echo "  logs:   Display container output logs"
+      echo "  run:    Run a command on a temporary service container"
+      echo
+      echo "Tool management"
+      echo "  check:      Check if current template is up-to-date"
+      echo "  init:       Initialize a project based on a template"
+      echo "  restore:    Restore last development session"
       echo "  rediscover: Checks cached locations for non-existing environments."
-      echo "  restore: Restore last development session"
-      echo "  run: Run a command on a temporary service container"
       echo "  selfupdate: Run self update"
-      echo "  up: Start the environment"
+      echo
+      echo "Additional options"
+      echo "  dc: Execute a Docker Compose command"
+      echo "  help: Display information about an option"
     fi
     return $?
   }
@@ -446,7 +454,7 @@ run() {
     return $?
   }
 
-  # Show container status
+  # Display status of service containers
   ps() {
     # If there is a docker-compose file present in the current directory, use the default.
     if [ -e "docker-compose.yml" ] || [ -e "docker-compose.yaml" ]; then
