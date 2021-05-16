@@ -348,6 +348,12 @@ run() {
       return 0
     }
 
+    restart() {
+      echo "Restart the environment."
+      echo "Usage: $0 restart"
+      return 0
+    }
+
     restore() {
       echo "Restore previous running instances after shutdown."
       echo "Usage: $0 restore"
@@ -387,6 +393,7 @@ run() {
       echo "  down:    Stop the environment"
       echo "  ps:      Display status of service containers"
       echo "  pull:    Pull latest images of service containers"
+      echo "  restart: Restart the environment"
       echo "  up:      Start the environment"
       echo
       echo "Service container interaction"
@@ -548,6 +555,13 @@ run() {
 
     echo "Updating ${CACHE_DIR}/active_environments"
     mv "${CACHE_DIR}/rediscover_active_environments" "${CACHE_DIR}/active_environments"
+    return $?
+  }
+
+  # Restart the environment
+  restart() {
+    down
+    up
     return $?
   }
 
