@@ -214,12 +214,12 @@ run() {
           return 0
         fi
         eval "$(parse_yaml $latestFilePath "COMPOSE_LATEST_VAR_")" &> /dev/null
-        if  [ -n "${COMPOSE_VAR_x_custom_version}" ] || [ -n "${COMPOSE_LATEST_VAR_x_custom_version}" ] && [ "${COMPOSE_LATEST_VAR_x_custom_version}" != "${COMPOSE_VAR_x_custom_version}" ]; then
+        if [ -n "${COMPOSE_VAR_x_custom_version}" ] || [ -n "${COMPOSE_LATEST_VAR_x_custom_version}" ] && [ "${COMPOSE_LATEST_VAR_x_custom_version}" != "${COMPOSE_VAR_x_custom_version}" ]; then
           echo "The current docker template is outdated, please run \"dev init ${COMPOSE_VAR_x_custom_type} -f\" to update it."
         else
           echo "The current docker template is up-to-date."
         fi
-      else
+      elif [ "$1" == "-v" ]; then
         echo "The current docker template is outdated, please run \"dev init PROJECT_TYPE -f\" to update it."
         echo "Available project types: "
         for type in "${APP_SELF_PATH}"/templates/*; do
@@ -287,6 +287,9 @@ run() {
 
     check() {
       echo "Check whether the currently used template is up-to-date."
+      echo "Usage: $0 check [-v]"
+      echo "Options:"
+      echo "  -v  Verbose output"
       return 0
     }
 
