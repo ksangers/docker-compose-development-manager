@@ -11,17 +11,17 @@ services:
       - "--entrypoints.web.address=:80"
       - "--entrypoints.web-secure.address=:443"
       - "--entrypoints.web-extra.address=:3200"
-      - "--entrypoints.mysql.address=:3306"
       - "--entrypoints.kibana.address=:5601"
       - "--entrypoints.mailcatch.address=:8025"
+      - "--entrypoints.fastapi.address=:8000"
     networks:
       - default
     ports:
       - "80:80"
       - "443:443"
       - "3200:3200"
-      - "3306:3306"
       - "5601:5601"
+      - "8000:8000"
       - "8025:8025"
       - "8080:8080"
     volumes:
