@@ -191,18 +191,9 @@ run() {
     check
   }
 
-  # Open the shell of a container
-  console() {
-    autoupdate
-    local shell="console"
-    [ "$1" != "" ] && shell=$1
-
-    $DC run \
-      --rm \
-      -u "$(id -u):$(id -g)" \
-      --no-deps \
-      "$shell"
-    return $?
+  # Build the services of the Docker Compose configuration"
+  build() {
+    $DC build
   }
 
   # Checks whether the current template version of the project is still the latest
@@ -258,7 +249,7 @@ run() {
     return $?
   }
 
-  # Execute a command on a specified container
+  # Execute a command on a running service container
   exec() {
     $DC exec "$@"
     return $?
@@ -269,17 +260,6 @@ run() {
     attach() {
       echo "Attach to a container."
       echo "Usage: $0 attach <container-name>"
-      return 0
-    }
-
-    console() {
-      echo "Open up a console on a service."
-      echo "Usage: $0 console [service]"
-      echo "Options:"
-      echo "  service: Defaults to console"
-      echo "Available services:"
-      load_env
-      $DC ps --services | xargs echo " "
       return 0
     }
 
@@ -302,7 +282,7 @@ run() {
     }
 
     exec() {
-      echo "Execute a command on a specified container"
+      echo "Execute a command on a running service container"
       echo "Usage: $0 exec <container> <command> [options...]"
       echo "Example: $0 exec redis redis-cli flushall"
       echo "For more info, see: docker-compose help exec"
@@ -341,8 +321,8 @@ run() {
     }
 
     run() {
-      echo "Run a command on the development environment."
-      echo "Usage: $0 run <command>"
+      echo "Run a command on a temporary service container."
+      echo "Usage: $0 run <service> <command>"
       echo "For more info, see: docker-compose help run"
       return 0
     }
@@ -367,15 +347,15 @@ run() {
     else
       echo "Usage: $0 <option>"
       echo "The following options are available"
-      echo "  console: Open the console"
+      echo "  build: Build the services of the Docker Compose configuration"
       echo "  dc: Execute a Docker Compose command"
       echo "  down: Stop the environment"
-      echo "  exec: Execute a command on a container"
+      echo "  exec: Execute a command on a running service container"
       echo "  init: Initialize a project based on a template"
       echo "  logs: Display container output logs"
       echo "  ps: Display container status"
       echo "  pull: Pull latest images"
-      echo "  run: Run a command"
+      echo "  run: Run a command on a temporary service container"
       echo "  selfupdate: Run self update"
       echo "  up: Start the environment"
     fi
@@ -439,10 +419,9 @@ run() {
     return $?
   }
 
-  # Run a command
+  # Run a command on a temporary service container
   run() {
-    autoupdate
-    $DC run console "$@"
+    $DC run "$@"
     return $?
   }
 
