@@ -41,7 +41,7 @@ load_env() {
   # Ensure an SSH socket is available
   if [[ "$SSH_AUTH_SOCK" == "" ]]; then
     SSH_AUTH_SOCK="/tmp/.ssh-sock"
-    ssh-agent -a "${SSH_AUTH_SOCK}"
+    ssh-agent -a "${SSH_AUTH_SOCK}" &> /dev/null
   fi
   export SSH_AUTH_SOCK
 
