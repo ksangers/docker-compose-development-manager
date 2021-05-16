@@ -217,7 +217,7 @@ run() {
       if [ -n "${COMPOSE_VAR_x_custom_type}" ]; then
         local latestFilePath
         latestFilePath="${APP_SELF_PATH}/templates/${COMPOSE_VAR_x_custom_type}/docker-compose.yml"
-        if [ ! -f $latestFilePath ]; then
+        if [ ! -f "$latestFilePath" ]; then
           return 0
         fi
         eval "$(parse_yaml $latestFilePath "COMPOSE_LATEST_VAR_")" &> /dev/null
