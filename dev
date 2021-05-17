@@ -175,8 +175,6 @@ run() {
     if [ "${cache_limit}" -nt "${cache_project}" ]; then
       touch "${cache_project}"
 
-      echo "Checking if new images are available ..."
-
       # Run the pull command and download images if available
       pull
     fi
@@ -593,7 +591,7 @@ run() {
   selfupdate() {
     # shellcheck disable=SC2164
     pushd "${APP_SELF_PATH}" > /dev/null
-    git pull origin "$(git branch --show-current)"
+    git pull origin "$(git branch --show-current)" &> /dev/null
     chmod +x "$0"
     # shellcheck disable=SC2164
     popd > /dev/null
