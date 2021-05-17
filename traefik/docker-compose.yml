@@ -1,0 +1,34 @@
+version: "3.4"
+networks:
+  default:
+    external:
+      name: gateway
+services:
+  traefik:
+    image: traefik:v2.4
+    container_name: traefik
+    command:
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=true"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.web-secure.address=:443"
+      - "--entrypoints.web-extra.address=:3200"
+      - "--entrypoints.kibana.address=:5601"
+      - "--entrypoints.mailcatch.address=:8025"
+      - "--entrypoints.fastapi.address=:8000"
+      - "--log.filePath=/var/log/traefik.log"
+      - "--log.level=DEBUG"
+    networks:
+      - default
+    ports:
+      - "80:80"
+      - "443:443"
+      - "3200:3200"
+      - "5601:5601"
+      - "8000:8000"
+      - "8025:8025"
+      - "8080:8080"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "/tmp/traefik:/var/log:rw"

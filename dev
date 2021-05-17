@@ -7,9 +7,9 @@ load_env() {
   UNAME=$(uname -s | tr '[:upper:]' '[:lower:]')
   # Then we map the output to the names used on the Github releases page
   case "$UNAME" in
-      linux*)     MACHINE=linux;;
-      darwin*)    MACHINE=macos;;
-      mingw*)     MACHINE=windows;;
+    linux*)  MACHINE=linux;;
+    darwin*) MACHINE=macos;;
+    mingw*)  MACHINE=windows;;
   esac
   export MACHINE
 
@@ -41,7 +41,7 @@ load_env() {
   # Ensure an SSH socket is available
   if [[ "$SSH_AUTH_SOCK" == "" ]]; then
     SSH_AUTH_SOCK="/tmp/.ssh-sock"
-    ssh-agent -a "${SSH_AUTH_SOCK}"
+    ssh-agent -a "${SSH_AUTH_SOCK}" &> /dev/null
   fi
   export SSH_AUTH_SOCK
 
@@ -57,12 +57,12 @@ load_env() {
   export GID
   export UID
   if [[ "${MACHINE}" == "windows" ]]; then
-    DC="winpty docker-compose"
+    DC="winpty docker-compose --log-level ERROR"
     CUID="1000"
     CGID="1000"
     CHOME="/home/app"
   else
-    DC="docker-compose"
+    DC="docker-compose --log-level ERROR"
     CUID="${UID}"
     CGID="${GID}"
     CHOME="${HOME}"
@@ -72,23 +72,23 @@ load_env() {
   export CHOME
 }
 
-function parse_yaml {
-   local prefix=$2
-   local s='[[:space:]]*' w='[a-zA-Z0-9_\-]*' fs=$(echo @|tr @ '\034')
-   sed -ne "s|^\($s\):|\1|" \
-        -e "s|^\($s\)\($w\)$s:$s[\"']\(.*\)[\"']$s\$|\1$fs\2$fs\3|p" \
-        -e "s|^\($s\)\($w\)$s:$s\(.*\)$s\$|\1$fs\2$fs\3|p"  $1 |
-   awk -F$fs '{
-      indent = length($1)/2;
-      vname[indent] = $2;
-      for (i in vname) {if (i > indent) {delete vname[i]}}
-      if (length($3) > 0) {
-         vn=""; for (i=0; i<indent; i++) {vn=(vn)(vname[i])("_")}
-         sub(/-/, "_", vn)
-         sub(/-/, "_", $2)
-         printf("%s%s%s=\"%s\"\n", "'$prefix'",vn, $2, $3);
-      }
-   }'
+parse_yaml() {
+  local prefix=$2
+  local s='[[:space:]]*' w='[a-zA-Z0-9_\-]*' fs=$(echo @|tr @ '\034')
+  sed -ne "s|^\($s\):|\1|" \
+    -e "s|^\($s\)\($w\)$s:$s[\"']\(.*\)[\"']$s\$|\1$fs\2$fs\3|p" \
+    -e "s|^\($s\)\($w\)$s:$s\(.*\)$s\$|\1$fs\2$fs\3|p"  $1 |
+  awk -F$fs '{
+    indent = length($1)/2;
+    vname[indent] = $2;
+    for (i in vname) {if (i > indent) {delete vname[i]}}
+    if (length($3) > 0) {
+      vn=""; for (i=0; i<indent; i++) {vn=(vn)(vname[i])("_")}
+      sub(/-/, "_", vn)
+      sub(/-/, "_", $2)
+      printf("%s%s%s=\"%s\"\n", "'$prefix'",vn, $2, $3);
+    }
+  }'
 }
 
 source_env() {
@@ -138,8 +138,9 @@ run() {
   APP_SELF_PATH=$(dirname "$(realpath "$0")")
   APP_PROJECT_PATH=$(pwd)
   APP_PROJECT=$(basename "${APP_SELF_PATH}")
+  TRAEFIK_LOCATION="$(realpath "$(dirname "$(realpath "$0" )")/traefik")"
 
-  # Turn on and attach to specified container
+  # Start and attach to a service container its output
   attach() {
     $DC up "$1"
     return $?
@@ -174,8 +175,6 @@ run() {
     if [ "${cache_limit}" -nt "${cache_project}" ]; then
       touch "${cache_project}"
 
-      echo "Checking if new images are available ..."
-
       # Run the pull command and download images if available
       pull
     fi
@@ -186,22 +185,14 @@ run() {
 
       # Run the self update command
       selfupdate
+      check
     fi
-
-    check
+    return $?
   }
 
-  # Open the shell of a container
-  console() {
-    autoupdate
-    local shell="console"
-    [ "$1" != "" ] && shell=$1
-
-    $DC run \
-      --rm \
-      -u "$(id -u):$(id -g)" \
-      --no-deps \
-      "$shell"
+  # Build the services of the Docker Compose configuration"
+  build() {
+    $DC build
     return $?
   }
 
@@ -217,19 +208,24 @@ run() {
       if [ -n "${COMPOSE_VAR_x_custom_type}" ]; then
         local latestFilePath
         latestFilePath="${APP_SELF_PATH}/templates/${COMPOSE_VAR_x_custom_type}/docker-compose.yml"
-        if [ ! -f $latestFilePath ]; then
+        if [ ! -f "$latestFilePath" ]; then
           return 0
         fi
         eval "$(parse_yaml $latestFilePath "COMPOSE_LATEST_VAR_")" &> /dev/null
-        if  [ -n "${COMPOSE_VAR_x_custom_version}" ] || [ -n "${COMPOSE_LATEST_VAR_x_custom_version}" ] && [ "${COMPOSE_LATEST_VAR_x_custom_version}" != "${COMPOSE_VAR_x_custom_version}" ]; then
+        if [ -n "${COMPOSE_VAR_x_custom_version}" ] || [ -n "${COMPOSE_LATEST_VAR_x_custom_version}" ] && [ "${COMPOSE_LATEST_VAR_x_custom_version}" != "${COMPOSE_VAR_x_custom_version}" ]; then
           echo "The current docker template is outdated, please run \"dev init ${COMPOSE_VAR_x_custom_type} -f\" to update it."
         else
           echo "The current docker template is up-to-date."
         fi
-      else
-        echo "The current docker template is outdated, please run \"dev init TEMPLATE_NAME -f\" to update it."
+      elif [ "$1" == "-v" ]; then
+        echo "The current docker template is outdated, please run \"dev init PROJECT_TYPE -f\" to update it."
+        echo "Available project types: "
+        for type in "${APP_SELF_PATH}"/templates/*; do
+          echo "- $(basename "${type}")"
+        done
       fi
     fi
+    return $?
   }
 
   # Run a Docker Compose command
@@ -243,23 +239,38 @@ run() {
     # If there is a docker-compose file present in the current directory, use the default.
     if [ -e "docker-compose.yml" ] || [ -e "docker-compose.yaml" ]; then
       $DC down "$@"
+      if [ ! -e "${CACHE_DIR}/active_environments" ]; then
+          touch "${CACHE_DIR}/active_environments"
+      fi
+      grep -xFv "$(pwd)" "${CACHE_DIR}/active_environments" > "${CACHE_DIR}/new_active_environments"
+      mv "${CACHE_DIR}/new_active_environments" "${CACHE_DIR}/active_environments"
+
+      if [ "$(grep -xFv "${TRAEFIK_LOCATION}" "${CACHE_DIR}/active_environments")" == "" ]; then
+        stop_traefik
+      fi
     else
       if [ -e "${CACHE_DIR}/known_locations" ]; then
-        while read -r location
-          do
-            if [ -e "${location}/docker-compose.yml" ]; then
-              source_env "${location}"
-              $DC -f "${location}/docker-compose.yml" down "$@"
-            fi
-          done < "${CACHE_DIR}/known_locations"
+        while read -r location; do
+          if [ -e "${location}/docker-compose.yml" ]; then
+            # Change directory so PWD is replaced correctly
+            cd "${location}" || exit
+            source_env "${location}"
+            $DC -f "${location}/docker-compose.yml" down "$@"
+            grep -vxF "${location}" "${CACHE_DIR}/active_environments" > "${CACHE_DIR}/new_active_environments"
+            mv "${CACHE_DIR}/new_active_environments" "${CACHE_DIR}/active_environments"
+          fi
+        done < "${CACHE_DIR}/known_locations"
       fi
     fi
+
+    publish_hosts
 
     return $?
   }
 
-  # Execute a command on a specified container
+  # Execute a command on a running service container
   exec() {
+    restore
     $DC exec "$@"
     return $?
   }
@@ -267,24 +278,16 @@ run() {
   # Get help for commands
   help() {
     attach() {
-      echo "Attach to a container."
+      echo "Start and attach to a service container its output"
       echo "Usage: $0 attach <container-name>"
-      return 0
-    }
-
-    console() {
-      echo "Open up a console on a service."
-      echo "Usage: $0 console [service]"
-      echo "Options:"
-      echo "  service: Defaults to console"
-      echo "Available services:"
-      load_env
-      $DC ps --services | xargs echo " "
       return 0
     }
 
     check() {
       echo "Check whether the currently used template is up-to-date."
+      echo "Usage: $0 check [-v]"
+      echo "Options:"
+      echo "  -v  Verbose output"
       return 0
     }
 
@@ -302,7 +305,7 @@ run() {
     }
 
     exec() {
-      echo "Execute a command on a specified container"
+      echo "Execute a command on a running service container"
       echo "Usage: $0 exec <container> <command> [options...]"
       echo "Example: $0 exec redis redis-cli flushall"
       echo "For more info, see: docker-compose help exec"
@@ -327,7 +330,7 @@ run() {
     }
 
     ps() {
-      echo "Display container status for current project"
+      echo "Display status of service containers"
       echo "Usage: $0 ps"
       echo "For more info, see: docker-compose help ps"
       return 0
@@ -340,9 +343,27 @@ run() {
       return 0
     }
 
+    rediscover() {
+      echo "Checks whether cached locations still exist."
+      echo "Usage: $0 rediscover"
+      return 0
+    }
+
+    restart() {
+      echo "Restart the environment."
+      echo "Usage: $0 restart"
+      return 0
+    }
+
+    restore() {
+      echo "Restore previous running instances after shutdown."
+      echo "Usage: $0 restore"
+      return 0
+    }
+
     run() {
-      echo "Run a command on the development environment."
-      echo "Usage: $0 run <command>"
+      echo "Run a command on a temporary service container."
+      echo "Usage: $0 run <service> <command>"
       echo "For more info, see: docker-compose help run"
       return 0
     }
@@ -366,18 +387,32 @@ run() {
       return $?
     else
       echo "Usage: $0 <option>"
-      echo "The following options are available"
-      echo "  console: Open the console"
-      echo "  dc: Execute a Docker Compose command"
-      echo "  down: Stop the environment"
-      echo "  exec: Execute a command on a container"
-      echo "  init: Initialize a project based on a template"
-      echo "  logs: Display container output logs"
-      echo "  ps: Display container status"
-      echo "  pull: Pull latest images"
-      echo "  run: Run a command"
+      echo "The following options are available."
+      echo
+      echo "General management"
+      echo "  build:   Build the services of the Docker Compose configuration"
+      echo "  down:    Stop the environment"
+      echo "  ps:      Display status of service containers"
+      echo "  pull:    Pull latest images of service containers"
+      echo "  restart: Restart the environment"
+      echo "  up:      Start the environment"
+      echo
+      echo "Service container interaction"
+      echo "  attach: Start and attach to a service container its output"
+      echo "  exec:   Execute a command on a running service container"
+      echo "  logs:   Display container output logs"
+      echo "  run:    Run a command on a temporary service container"
+      echo
+      echo "Tool management"
+      echo "  check:      Check if current template is up-to-date"
+      echo "  init:       Initialize a project based on a template"
+      echo "  restore:    Restore last development session"
+      echo "  rediscover: Checks cached locations for non-existing environments."
       echo "  selfupdate: Run self update"
-      echo "  up: Start the environment"
+      echo
+      echo "Additional options"
+      echo "  dc: Execute a Docker Compose command"
+      echo "  help: Display information about an option"
     fi
     return $?
   }
@@ -415,10 +450,10 @@ run() {
       return $?
     elif [ -e "${APP_PROJECT_PATH}/docker-compose.yml" ] || [ -e "${APP_PROJECT_PATH}/docker-compose.yaml" ]; then
       echo "Warning: Project already initialized. Use --force to re-initialize the project"
-      exit 1
+      return 1
     fi
     run help init
-    exit 1
+    return 1
   }
 
   # Show container output logs
@@ -427,9 +462,47 @@ run() {
     return $?
   }
 
-  # Show container status
+  # Display status of service containers
   ps() {
-    $DC ps "$@"
+    # If there is a docker-compose file present in the current directory, use the default.
+    if [ -e "docker-compose.yml" ] || [ -e "docker-compose.yaml" ]; then
+      $DC ps "$@"
+    else
+      if [ -e "${CACHE_DIR}/known_locations" ]; then
+        while read -r location; do
+          if [ -e "${location}/docker-compose.yml" ]; then
+            # Change directory so PWD is replaced correctly
+            echo "Project located at ${location}:"
+            cd "${location}" || exit
+            source_env "${location}"
+            $DC -f "${location}/docker-compose.yml" ps "$@"
+          fi
+        done < "${CACHE_DIR}/known_locations"
+      fi
+    fi
+    return $?
+  }
+
+  # Publish all hosts with the dev_domain label
+  publish_hosts() {
+    if [ -e "${CACHE_DIR}/published_hosts" ]; then
+      while read -r line; do
+        kill "$(/bin/ps -ao pid,cmd | grep -Po "[0-9]+ (?=$(echo $line | sed 's/\./\\\./g'))")" 2> /dev/null
+      done < "${CACHE_DIR}/published_hosts"
+      rm "${CACHE_DIR}/published_hosts"
+    fi
+
+    if [ "$(wc -l < "${CACHE_DIR}/active_environments")" != "0" ]; then
+      docker inspect \
+        -f '{{if .Config.Labels.dev_domain}}{{.Config.Labels.dev_domain}} {{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}{{end}}' \
+        $(docker ps -aq) | \
+        egrep '^[a-z0-9\-\.]+ [0-9\.]+$' | \
+        xargs --max-lines=1 echo "avahi-publish -a $line" >> "${CACHE_DIR}/published_hosts"
+
+      if [ -e "${CACHE_DIR}/published_hosts" ]; then
+        source "${CACHE_DIR}/published_hosts" 2> /dev/null
+      fi
+    fi
     return $?
   }
 
@@ -439,10 +512,78 @@ run() {
     return $?
   }
 
-  # Run a command
+  # Run a command on a temporary service container
   run() {
-    autoupdate
-    $DC run console "$@"
+    $DC run "$@"
+    return $?
+  }
+
+  # Rediscover known locations
+  rediscover() {
+    if [ ! -e "${CACHE_DIR}/known_locations" ]; then
+      touch "${CACHE_DIR}/known_locations"
+    fi
+
+    if [ ! -e "${CACHE_DIR}/active_environments" ]; then
+      touch "${CACHE_DIR}/active_environments"
+    fi
+
+    touch "${CACHE_DIR}/rediscover_known_locations"
+    touch "${CACHE_DIR}/rediscover_active_environments"
+
+    echo "Checking known locations"
+    while read -r location; do
+      if [ -e "${location}/docker-compose.yml" ]; then
+        echo "${location} still exists"
+        echo "${location}" >> "${CACHE_DIR}/rediscover_known_locations"
+      else
+        echo "${location} no longer exists"
+      fi
+    done < "${CACHE_DIR}/known_locations"
+
+    echo "Updating ${CACHE_DIR}/known_locations"
+    mv "${CACHE_DIR}/rediscover_known_locations" "${CACHE_DIR}/known_locations"
+
+    echo "Checking active environments"
+    while read -r location; do
+      if [ -e "${location}/docker-compose.yml" ]; then
+        echo "${location} still exists"
+        echo "${location}" >> "${CACHE_DIR}/rediscover_active_environments"
+      else
+        echo "${location} no longer exists"
+      fi
+    done < "${CACHE_DIR}/active_environments"
+
+    echo "Updating ${CACHE_DIR}/active_environments"
+    mv "${CACHE_DIR}/rediscover_active_environments" "${CACHE_DIR}/active_environments"
+    return $?
+  }
+
+  # Restart the environment
+  restart() {
+    down
+    up
+    return $?
+  }
+
+  # Restore previous development session
+  restore() {
+    rediscover &> /dev/null
+
+    CURRENT_DIRECTORY="$(pwd)"
+    while read -r location; do
+      cd "${location}" || exit
+      source_env "${location}"
+      top_output="$($DC -f "${location}/docker-compose.yml" top)"
+      if [[ $top_output == '' ]]; then
+        echo "Restoring ${location}"
+        $DC -f "${location}/docker-compose.yml" up -d
+        if grep -q "dev_domain=" "docker-compose.yml" "docker-compose.yaml" 2> /dev/null; then
+          publish_hosts
+        fi
+      fi
+    done < "${CACHE_DIR}/active_environments"
+    cd "$CURRENT_DIRECTORY" || exit
     return $?
   }
 
@@ -450,19 +591,62 @@ run() {
   selfupdate() {
     # shellcheck disable=SC2164
     pushd "${APP_SELF_PATH}" > /dev/null
-    git pull origin master
+    git pull origin "$(git branch --show-current)" &> /dev/null
     chmod +x "$0"
     # shellcheck disable=SC2164
     popd > /dev/null
   }
 
+  # Start the Traefik proxy
+  start_traefik() {
+    # Create the gateway network if it is not yet available
+    if docker network list --format "{{.Name}}" | grep -xcq gateway; then
+      docker network create \
+        --driver=bridge \
+        --attachable \
+        --internal=false \
+        gateway &> /dev/null
+    fi
+
+    # Check if Traefik is already active
+    if ! grep -qxF "${TRAEFIK_LOCATION}" "${CACHE_DIR}/active_environments" &> /dev/null; then
+      $DC -f "${TRAEFIK_LOCATION}/docker-compose.yml" up -d
+      echo "${TRAEFIK_LOCATION}" >> "${CACHE_DIR}/active_environments"
+    fi
+  }
+
+  # Stop the Traefik proxy
+  stop_traefik() {
+    if grep -qxF "${TRAEFIK_LOCATION}" "${CACHE_DIR}/active_environments" &> /dev/null; then
+      $DC -f "${TRAEFIK_LOCATION}/docker-compose.yml" down
+      grep -xFv "${TRAEFIK_LOCATION}" "${CACHE_DIR}/active_environments" > "${CACHE_DIR}/new_active_environments"
+      mv "${CACHE_DIR}/new_active_environments" "${CACHE_DIR}/active_environments"
+    fi
+  }
+
   # Turn on all containers or a specific container
   up() {
     autoupdate
+    restore
+    if grep -q "traefik.enable=true" "docker-compose.yml" "docker-compose.yaml" 2> /dev/null; then
+      start_traefik
+    fi
+
     if ! grep -qxF $(pwd) "${CACHE_DIR}/known_locations" &> /dev/null; then
       pwd >> "${CACHE_DIR}/known_locations"
     fi
+
     $DC up -d "$@"
+
+    # If the environment is not in the active list, add it
+    if ! grep -qxF "$(pwd)" "${CACHE_DIR}/active_environments" &> /dev/null; then
+      pwd >> "${CACHE_DIR}/active_environments"
+    fi
+
+    if grep -q "dev_domain=" "docker-compose.yml" "docker-compose.yaml" 2> /dev/null; then
+      publish_hosts
+    fi
+
     return $?
   }
 
