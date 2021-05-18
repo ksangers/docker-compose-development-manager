@@ -9,16 +9,24 @@ services:
     container_name: traefik
     command:
       - "--api.insecure=true"
+      # Enable Docker provider
       - "--providers.docker=true"
-      - "--providers.docker.exposedbydefault=true"
-      - "--entrypoints.web.address=:80"
-      - "--entrypoints.web-secure.address=:443"
-      - "--entrypoints.web-extra.address=:3200"
+      # Only expose explicitly defined services
+      - "--providers.docker.exposedbydefault=false"
+      # Set up entrypoints
+      - "--entrypoints.fastapi.address=:8000"
+      - "--entrypoints.http.address=:80"
+      - "--entrypoints.http-alt.address=:8080"
+      - "--entrypoints.https.address=:443"
+      - "--entrypoints.https-alt.address=:8443"
       - "--entrypoints.kibana.address=:5601"
       - "--entrypoints.mailcatch.address=:8025"
-      - "--entrypoints.fastapi.address=:8000"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.web-extra.address=:3200"
+      - "--entrypoints.web-secure.address=:443"
+      # Enable logging
       - "--log.filePath=/var/log/traefik.log"
-      - "--log.level=DEBUG"
+      - "--log.level=INFO"
     networks:
       - default
     ports:
@@ -29,6 +37,7 @@ services:
       - "8000:8000"
       - "8025:8025"
       - "8080:8080"
+      - "8443:8443"
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
       - "/tmp/traefik:/var/log:rw"
