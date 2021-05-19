@@ -8,7 +8,6 @@ services:
     image: traefik:v2.4
     container_name: traefik
     command:
-      - "--api.insecure=true"
       # Enable Docker provider
       - "--providers.docker=true"
       # Only expose explicitly defined services
@@ -27,10 +26,7 @@ services:
     ports:
       - "80:80"
       - "443:443"
-      - "3200:3200"
-      - "5601:5601"
       - "8000:8000"
-      - "8025:8025"
       - "8080:8080"
       - "8443:8443"
     volumes:
