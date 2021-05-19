@@ -19,11 +19,6 @@ services:
       - "--entrypoints.http-alt.address=:8080"
       - "--entrypoints.https.address=:443"
       - "--entrypoints.https-alt.address=:8443"
-      - "--entrypoints.kibana.address=:5601"
-      - "--entrypoints.mailcatch.address=:8025"
-      - "--entrypoints.web.address=:80"
-      - "--entrypoints.web-extra.address=:3200"
-      - "--entrypoints.web-secure.address=:443"
       # Enable logging
       - "--log.filePath=/var/log/traefik.log"
       - "--log.level=INFO"
