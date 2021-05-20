@@ -13,9 +13,9 @@ services:
       # Only expose explicitly defined services
       - "--providers.docker.exposedbydefault=false"
       # Set up entrypoints
-      - "--entrypoints.fastapi.address=:8000"
       - "--entrypoints.http.address=:80"
       - "--entrypoints.http-alt.address=:8080"
+      - "--entrypoints.http-alt2.address=:8000"
       - "--entrypoints.https.address=:443"
       - "--entrypoints.https-alt.address=:8443"
       # Enable logging
