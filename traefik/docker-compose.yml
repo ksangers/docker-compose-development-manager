@@ -13,11 +13,11 @@ services:
       # Only expose explicitly defined services
       - "--providers.docker.exposedbydefault=false"
       # Set up entrypoints
-      - "--entrypoints.http.address=:80"
-      - "--entrypoints.http-alt.address=:8080"
-      - "--entrypoints.http-alt2.address=:8000"
-      - "--entrypoints.https.address=:443"
-      - "--entrypoints.https-alt.address=:8443"
+      - "--entrypoints.http-80.address=:80"
+      - "--entrypoints.http-8000.address=:8000"
+      - "--entrypoints.http-8080.address=:8080"
+      - "--entrypoints.https-443.address=:443"
+      - "--entrypoints.https-8443.address=:8443"
       # Enable logging
       - "--log.filePath=/var/log/traefik.log"
       - "--log.level=INFO"
