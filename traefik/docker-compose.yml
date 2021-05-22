@@ -12,23 +12,14 @@ services:
       - "--providers.docker=true"
       # Only expose explicitly defined services
       - "--providers.docker.exposedbydefault=false"
-      # Set up entrypoints
-      - "--entrypoints.http-80.address=:80"
-      - "--entrypoints.http-8000.address=:8000"
-      - "--entrypoints.http-8080.address=:8080"
-      - "--entrypoints.https-443.address=:443"
-      - "--entrypoints.https-8443.address=:8443"
-      # Enable logging
-      - "--log.filePath=/var/log/traefik.log"
+      # Set log level
       - "--log.level=INFO"
     networks:
       - default
     ports:
       - "80:80"
       - "443:443"
-      - "8000:8000"
       - "8080:8080"
       - "8443:8443"
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
-      - "/tmp/traefik:/var/log:rw"
