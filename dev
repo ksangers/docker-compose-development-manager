@@ -84,7 +84,6 @@ run() {
     return $?
   }
   exec() {
-    restore
     $DC exec "$@"
     return $?
   }
