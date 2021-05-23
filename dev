@@ -8,7 +8,8 @@ if [[ "$(id -u)" == "0" ]]; then
   exit 1
 fi
 if [ -e /proc/1/cgroup ] && ! head -n1 /proc/1/sched | grep -qce '\(init\|systemd\)'; then
-  echo "This script should not be run from a docker container." && exit 1
+  echo "This script should not be run from a docker container."
+  exit 1
 fi
 
 run() {
@@ -42,9 +43,11 @@ run() {
     if [ -n "$dc_x_custom_type" ] && [ -e "$dc_latest" ]; then
       eval "$(parse_yaml "$dc_latest" "dcl_")" &>/dev/null
       if [ -n "$dc_x_custom_version" ] || [ -n "$dcl_x_custom_version" ] && [ "$dcl_x_custom_version" != "$dc_x_custom_version" ]; then
-        echo "The current docker template is outdated, run \"dev init $dc_x_custom_type -f\" to update it." && return 1
+        echo "The current docker template is outdated, run \"dev init $dc_x_custom_type -f\" to update it."
+        return 1
       else
-        echo "The current docker template is up-to-date." && return 0
+        echo "The current docker template is up-to-date."
+        return 0
       fi
     elif [ "$1" == "-v" ]; then
       echo "The current docker template is outdated, run \"dev init PROJECT_TYPE -f\" to update it."
@@ -168,10 +171,8 @@ run() {
     readonly local cache_kl="$cache_dir/known_locations"
     readonly local cache_ae="$cache_dir/active_environments"
     readonly local cache_ph="$cache_dir/published_hosts"
-    readonly local cache_ne="$cache_dir/new_environments"
-    readonly local cache_rl="$cache_dir/rediscover_known_locations"
     # shellcheck disable=SC2034
-    readonly local cache_ra="$cache_dir/rediscover_active_environments"
+    readonly local cache_ne="$cache_dir/new_environments"
     source "$self_path/help"
     test -e "$cache_dir" && mkdir -p "$cache_dir"
     for i in "$cache_lc" "$cache_pi" "$cache_su" "$cache_kl" "$cache_ae" "$cache_ph" "$cache_ne" "$cache_rl" "$cache_ra"; do
@@ -179,14 +180,14 @@ run() {
     done
     find "$cache_dir" -type f -mtime +1 -delete
     set -a
-  # shellcheck disable=SC1090
+    # shellcheck disable=SC1090
     for i in .env{,."$env"}{,.local}; do test -e "$1/$i" && source "$1/$i"; done
     set +a
     if docker network list --format "{{.Name}}" | grep -xcq gateway; then
       docker network create --driver=bridge --attachable --internal=false gateway &>/dev/null
     fi
     return 0
- }
+  }
   logs() {
     $DC logs "$@"
     return
@@ -195,8 +196,8 @@ run() {
     local prefix="$2"
     local s='[[:space:]]*'
     local w='[a-zA-Z0-9_\-]*'
-    # shellcheck disable=SC2155
-    local fs="$(echo @ | tr @ '\034')"
+    local fs
+    fs="$(echo @ | tr @ '\034')"
     # shellcheck disable=SC1087
     # shellcheck disable=SC2086
     sed -ne "s|^\($s\):|\1|" \
@@ -246,20 +247,12 @@ run() {
     return
   }
   # shellcheck disable=SC2120
-  pull() { $DC pull "$@" && return; }
-  run() { $DC run "$@" && return; }
-  rediscover() {
-    while read -r i; do for dc_file in docker-compose.y{a,}ml; do
-      if [ -e "$i/$dc_file" ]; then
-        echo "$i" >>"$cache_rl"
-        echo "$i" >>"$cache_ra"
-        break
-      fi
-    done; done <"$cache_kl"
-    cp "$cache_rl" "$cache_kl"
-    cp "$cache_ra" "$cache_ae"
-    touch "$cache_rl"
-    touch "$cache_ra"
+  pull() {
+    $DC pull "$@"
+    return
+  }
+  run() {
+    $DC run "$@"
     return
   }
   # shellcheck disable=SC2119
@@ -268,32 +261,29 @@ run() {
     up
     return
   }
-  restore() {
-    rediscover
-    while read -r i; do
-      cd "$i" || exit
-      top_output="$($self_bin dc -f "$i/docker-compose.yml" top)"
-      if [[ $top_output == '' ]]; then $self_bin up; fi
-    done <"$cache_ae"
-    return
-  }
   self_update() {
     cd "$self_path" >/dev/null
     git pull origin "$(git branch --show-current)" &>/dev/null
     chmod +x "$self_bin"
   }
-  start_traefik() { test ! grep -qxF "$traefik_path" "$cache_ae" && $DC -f "$traefik_dc" up -d && echo "$traefik_path" >>"$cache_ae"; }
+  start_traefik() {
+    if ! grep -qxF "$traefik_path" "$cache_ae"; then
+      $DC -f "$traefik_dc" up -d
+      echo "$traefik_path" >>"$cache_ae"
+    fi
+    return
+  }
   stop_traefik() {
     if grep -qxF "$traefik_path" "$cache_ae"; then
       $DC -f "$traefik_dc" down
       grep -xFv "$traefik_path" "$cache_ae" >"$cache_ne"
       cp "$cache_ne" "$cache_ae"
     fi
+    return
   }
   # shellcheck disable=SC2120
   up() {
     auto_update
-    restore
     for dc_file in docker-compose.y{a,}ml; do test -e "$dc_file" && break; done
     grep -Eq "[^#]*traefik" "$dc_file" && start_traefik
     grep -qxF "$pwd" "$cache_kl" &>/dev/null || pwd >>"$cache_kl"
