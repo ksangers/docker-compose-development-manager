@@ -63,9 +63,9 @@ help() {
     echo "Usage: $0 run <service> <command>"
     echo "For more info, see: docker-compose help run"
   }
-  selfupdate() {
+  self_update() {
     echo "Run self update."
-    echo "Usage: $0 selfupdate"
+    echo "Usage: $0 self_update"
   }
   up() {
     echo "Turn on development environment."
@@ -93,9 +93,7 @@ help() {
     echo "Tool management"
     echo "  check:      Check if current template is up-to-date"
     echo "  init:       Initialize a project based on a template"
-    echo "  restore:    Restore last development session"
-    echo "  rediscover: Checks cached locations for non-existing environments."
-    echo "  selfupdate: Run self update"
+    echo "  self_update: Run self update"
     echo
     echo "Additional options"
     echo "  dc: Execute a Docker Compose command"
