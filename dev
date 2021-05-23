@@ -87,6 +87,11 @@ run() {
     $DC exec "$@"
     return $?
   }
+  help() {
+    source "$(dirname "$(realpath "$0")")/help"
+    help "$@"
+    return 0
+  }
   # shellcheck disable=SC2120
   init() {
     local force=0
@@ -292,12 +297,8 @@ run() {
     return
   }
   if [ "$(type -t "$1")" == "function" ]; then
-    if [ "$1" == "init" ] || load_env; then "$@"; fi
+    if [ "$1" == "init" ] || [ "$1" == "help" ] || load_env; then "$@"; fi
     return
-  elif [ "$1" == "help" ]; then
-    source "$(dirname "$(realpath "$0")")/help"
-    help "$@"
-    return 0
   else
     source "$(dirname "$(realpath "$0")")/help"
     help "$@"

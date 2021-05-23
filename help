@@ -29,7 +29,7 @@ help() {
     echo "Initialize a project type for development."
     echo "Usage: $0 init [-f|--force] <project-type>"
     echo "Available project types: "
-    for type in "$self_path"/templates/*; do echo "- $(basename "$type")"; done
+    for type in "$(dirname "$(realpath "$0")")"/templates/*; do echo "- $(basename "$type")"; done
   }
   logs() {
     echo "Display container output logs."
