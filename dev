@@ -74,9 +74,9 @@ run() {
     else
       for dc_file in docker-compose.y{a,}ml; do if [ -e "$dc_file" ]; then
         $DC down "$@"
-        grep -xFv "$pwd" "$cache_ae" >"$cache_ne"
+        grep -xFv "$pwd" "$cache_ae" >"$cache_ne" || true
         cp "$cache_ne" "$cache_ae"
-        grep -xFvc "$traefik_path" "$cache_ae" || stop_traefik
+        grep -xFvcq "$traefik_path" "$cache_ae" || stop_traefik
         break
       fi; done
     fi
@@ -236,7 +236,7 @@ run() {
   publish_hosts() {
     while read -r line; do
       # shellcheck disable=SC2001
-      kill "$(/bin/ps -ao pid,cmd | grep -Po "[0-9]+ (?=$(echo "$line" | sed 's/\./\\\./g'))")" 2>/dev/null
+      kill "$(/bin/ps -ao pid,cmd | grep -Po "[0-9]+ (?=$(echo "$line" | sed 's/\./\\\./g'))")" 2>/dev/null || true
     done <"$cache_ph"
     touch "$cache_ph"
     if [ "$(wc -l <"$cache_ae")" != "0" ]; then
@@ -259,10 +259,9 @@ run() {
     $DC run "$@"
     return
   }
-  # shellcheck disable=SC2119
   restart() {
-    down
-    up
+    down "$@"
+    up "$@"
     return
   }
   self_update() {
@@ -280,7 +279,7 @@ run() {
   stop_traefik() {
     if grep -qxF "$traefik_path" "$cache_ae"; then
       $DC -f "$traefik_dc" down
-      grep -xFv "$traefik_path" "$cache_ae" >"$cache_ne"
+      grep -xFv "$traefik_path" "$cache_ae" >"$cache_ne" || touch "$cache_ne"
       cp "$cache_ne" "$cache_ae"
     fi
     return
@@ -293,7 +292,7 @@ run() {
     grep -qxF "$pwd" "$cache_kl" &>/dev/null || pwd >>"$cache_kl"
     $DC up -d "$@"
     grep -qxF "$pwd" "$cache_ae" &>/dev/null || pwd >>"$cache_ae"
-    grep -q "dev_domain=" "$dc_file" && publish_hosts
+    ! grep -q "dev_domain=" "$dc_file" || publish_hosts
     return
   }
   if [ "$(type -t "$1")" == "function" ]; then
