@@ -11,7 +11,7 @@ services:
       # Enable Docker provider
       - "--providers.docker=true"
       # Only expose explicitly defined services
-      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.exposedByDefault=true"
       # Set log level
       - "--log.level=INFO"
     networks:
