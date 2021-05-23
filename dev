@@ -63,6 +63,7 @@ run() {
     readonly self_bin="$(realpath "$0")"
     readonly self_path="$(dirname "$self_bin")"
     readonly pwd="$(pwd)"
+    readonly PWD="$pwd"
     readonly traefik_path="$self_path/traefik"
     readonly traefik_dc="$traefik_path/docker-compose.yaml"
     readonly cache_dir="$HOME/.cache/development-manager-docker-compose"
@@ -72,6 +73,7 @@ run() {
     readonly cache_ae="$cache_dir/active_environments"
     readonly cache_ph="$cache_dir/published_hosts"
     readonly cache_ne="$cache_dir/new_environments"
+    export PWD
     cache_pi="$cache_dir/project_id_$(echo "$pwd" | base64)"
     source "$self_path/help"
     [ -e "$cache_dir" ] && mkdir -p "$cache_dir"
@@ -241,7 +243,10 @@ run() {
   }
   local dc_proxy=(build exec logs pull run)
   readonly dc_proxy
-  for i in "${dc_proxy[@]}"; do [ "$i" == "$1" ] && _load_env && $DC "$@" && return; done
+  for i in "${dc_proxy[@]}"; do if [ "$i" == "$1" ]; then
+    _load_env && $DC "$@" && return
+    exit $?
+  fi; done
   if [ "$(type -t "$1")" == "function" ]; then
     [ "$1" == "init" ] || [ "$1" == "help" ] || _load_env && "$@"
     return
