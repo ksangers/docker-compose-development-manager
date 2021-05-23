@@ -25,7 +25,7 @@ run() {
     fi
     if [ "$cache_lc" -nt "$cache_su" ]; then
       touch "$cache_su"
-      selfupdate
+      self_update
       check
     fi
     return
@@ -277,7 +277,7 @@ run() {
     done <"$cache_ae"
     return
   }
-  selfupdate() {
+  self_update() {
     cd "$self_path" >/dev/null
     git pull origin "$(git branch --show-current)" &>/dev/null
     chmod +x "$self_bin"
@@ -292,7 +292,7 @@ run() {
   }
   # shellcheck disable=SC2120
   up() {
-    autoupdate
+    auto_update
     restore
     for dc_file in docker-compose.y{a,}ml; do test -e "$dc_file" && break; done
     grep -Eq "[^#]*traefik" "$dc_file" && start_traefik
