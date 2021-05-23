@@ -175,7 +175,7 @@ run() {
     readonly local cache_ne="$cache_dir/new_environments"
     source "$self_path/help"
     test -e "$cache_dir" && mkdir -p "$cache_dir"
-    for i in "$cache_lc" "$cache_pi" "$cache_su" "$cache_kl" "$cache_ae" "$cache_ph" "$cache_ne" "$cache_rl" "$cache_ra"; do
+    for i in "$cache_lc" "$cache_pi" "$cache_su" "$cache_kl" "$cache_ae" "$cache_ph" "$cache_ne"; do
       if [ ! -e "$i" ]; then touch "$i"; fi
     done
     find "$cache_dir" -type f -mtime +1 -delete
