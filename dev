@@ -296,6 +296,7 @@ run() {
     if [ "$1" == "init" ] || load_env; then "$@"; fi
     return
   elif [ "$1" == "help" ]; then
+    source "$(dirname "$(realpath "$0")")/help"
     help "$@"
     return 0
   else
