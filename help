@@ -46,17 +46,9 @@ help() {
     echo "Usage: $0 pull"
     echo "For more info, see: docker-compose help pull"
   }
-  rediscover() {
-    echo "Checks whether cached locations still exist."
-    echo "Usage: $0 rediscover"
-  }
   restart() {
     echo "Restart the environment."
     echo "Usage: $0 restart"
-  }
-  restore() {
-    echo "Restore previous running instances after shutdown."
-    echo "Usage: $0 restore"
   }
   run() {
     echo "Run a command on a temporary service container."
@@ -91,8 +83,8 @@ help() {
     echo "  run:    Run a command on a temporary service container"
     echo
     echo "Tool management"
-    echo "  check:      Check if current template is up-to-date"
-    echo "  init:       Initialize a project based on a template"
+    echo "  check:       Check if current template is up-to-date"
+    echo "  init:        Initialize a project based on a template"
     echo "  self_update: Run self update"
     echo
     echo "Additional options"
