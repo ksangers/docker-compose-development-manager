@@ -63,7 +63,6 @@ run() {
     readonly self_bin="$(realpath "$0")"
     readonly self_path="$(dirname "$self_bin")"
     readonly pwd="$(pwd)"
-    readonly PWD="$pwd"
     readonly traefik_path="$self_path/traefik"
     readonly traefik_dc="$traefik_path/docker-compose.yaml"
     readonly cache_dir="$HOME/.cache/development-manager-docker-compose"
@@ -73,6 +72,7 @@ run() {
     readonly cache_ae="$cache_dir/active_environments"
     readonly cache_ph="$cache_dir/published_hosts"
     readonly cache_ne="$cache_dir/new_environments"
+    PWD="$pwd"
     export PWD
     cache_pi="$cache_dir/project_id_$(echo "$pwd" | base64)"
     source "$self_path/help"
