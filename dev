@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # vim: et:sw=2:ts=2:ai
 
-set -e
+set -euo pipefail
 
 if [[ "$(id -u)" == "0" ]]; then
   echo "This script should not be run as root."
