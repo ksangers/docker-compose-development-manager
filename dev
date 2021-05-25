@@ -19,16 +19,16 @@ run() {
     [ "$cache_lc" -nt "$cache_su" ] && touch "$cache_su" && self_update && check
     return 0
   }
-  _find_dc_and_retry() {
+  _find_dc_and_try() {
     local path="$pwd"
     while [[ $path != / ]]; do
-      path="$(readlink -f "$path"/..)"
       for dc_file in docker-compose.y{a,}ml; do if [ -e "$path/$dc_file" ]; then
         cd "$path"
         pwd="$path"
-        $self_bin "$@"
+        "$@"
         exit $?
       fi; done
+      path="$(readlink -f "$path"/..)"
     done
   }
   _in_array() {
@@ -261,17 +261,11 @@ set -e
   }
   local dc_proxy=(build exec logs pull run)
   readonly dc_proxy
-  if _in_array "${1:-}" "${dc_proxy[@]}"; then _load_env && $DC "$@" && return || exit $?; fi
+  if _in_array "${1:-}" "${dc_proxy[@]}"; then _load_env && _find_dc_and_try $DC "$@" && return || exit $?; fi
   local global_actions=(help init self_update)
   readonly global_actions
   if _in_array "${1:-}" "${global_actions[@]}"; then "$@" && return || exit $?; fi
-  if [ "$(type -t "${1:-}")" == "function" ]; then
-    for dc_file in docker-compose.y{a,}ml; do [ -e "$dc_file" ] && break; done
-    [ -e "$dc_file" ] && _load_env && "$@" && return 
-    [ ! -e "$dc_file" ] && _load_env && _find_dc_and_retry "$@" && return
-    return
-  else
-    source "$(dirname "$(realpath "$0")")/help" && help "$@" && return 1
-  fi
+  if [ "$(type -t "${1:-}")" == "function" ]; then _load_env && _find_dc_and_try "$@" && return || exit $?
+  else source "$(dirname "$(realpath "$0")")/help" && help "$@" && return 1 || exit $?; fi
 }
 run "$@" && exit $?
