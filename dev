@@ -261,10 +261,10 @@ set -e
   }
   local dc_proxy=(build exec logs pull run)
   readonly dc_proxy
-  if _in_array "${1:-}" $dc_proxy; then _load_env && "$@" && return || exit $?; fi
+  if _in_array "${1:-}" "${dc_proxy[@]}"; then _load_env && $DC "$@" && return || exit $?; fi
   local global_actions=(dc help init self_update)
   readonly global_actions
-  if _in_array "${1:-}" $global_actions; then echo 123 && "$@" && return || exit $?; fi
+  if _in_array "${1:-}" "${global_actions[@]}"; then "$@" && return || exit $?; fi
   if [ "$(type -t "${1:-}")" == "function" ]; then
     for dc_file in docker-compose.y{a,}ml; do [ -e "$dc_file" ] && break; done
     [ -e "$dc_file" ] && _load_env && "$@" && return 
