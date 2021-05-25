@@ -177,25 +177,24 @@ run() {
   }
   # shellcheck disable=SC2120
   down() {
-    if [ "$1" == "-a" ]; then
+    for arg; do if [ "$arg" == "-a" ]; then
       while read -r i; do for dc_file in docker-compose.y{a,}ml; do
         [ -e "$i/$dc_file" ] && cd "$i" && $self_bin down && break
       done; done <"$cache_kl"
-    else
-      for dc_file in docker-compose.y{a,}ml; do if [ -e "$dc_file" ]; then
-        $DC down "$@"
-        grep -xFv "$pwd" "$cache_ae" >"$cache_ne" || true
-        cp "$cache_ne" "$cache_ae"
-        grep -xFvcq "$traefik_path" "$cache_ae" || _stop_traefik
-        break
-      fi; done
-    fi
+      return
+    fi; done
+    for dc_file in docker-compose.y{a,}ml; do if [ -e "$dc_file" ]; then
+      $DC down "$@"
+      grep -xFv "$pwd" "$cache_ae" >"$cache_ne" || true
+      cp "$cache_ne" "$cache_ae"
+      grep -xFvcq "$traefik_path" "$cache_ae" || _stop_traefik
+      break
+    fi; done
     _publish_hosts
     return $?
   }
   help() {
     source "$(dirname "$(realpath "$0")")/help"
-    help "$@"
     return 0
   }
   # shellcheck disable=SC2120
@@ -226,13 +225,14 @@ run() {
     return 1
   }
   ps() {
-    if [ "$1" == "-a" ]; then
+    for arg; do if [ "$arg" == "-a" ]; then
       while read -r i; do for dc_file in docker-compose.y{a,}ml; do
         [ -e "$i/$dc_file" ] && cd "$i" && $self_bin ps && break
       done; done <"$cache_kl"
-    else
-      for dc_file in docker-compose.y{a,}ml; do [ -e "$dc_file" ] && $DC ps "$@" && break; done
-    fi
+      return
+    fi; done
+set -e
+    for dc_file in docker-compose.y{a,}ml; do [ -e "$dc_file" ] && $DC ps "$@" && break; done
     return
   }
   restart() {
@@ -258,17 +258,11 @@ run() {
   }
   local dc_proxy=(build exec logs pull run)
   readonly dc_proxy
-  for i in "${dc_proxy[@]}"; do if [ "$i" == "$1" ]; then
-    _load_env && $DC "$@" && return
-    exit $?
-  fi; done
+  if _in_array "${1:-}" $dc_proxy; then _load_env && "$@" && return || exit $?; fi
   local global_actions=(dc help init self_update)
   readonly global_actions
-  for i in "${global_actions[@]}"; do if [ "$i" == "$1" ]; then
-    "$@" && return
-    exit $?
-  fi; done
-  if [ "$(type -t "$1")" == "function" ]; then
+  if _in_array "${1:-}" $global_actions; then "$@" && return || exit $?; fi
+  if [ "$(type -t "${1:-}")" == "function" ]; then
     for dc_file in docker-compose.y{a,}ml; do [ -e "$dc_file" ] && break; done
     [ -e "$dc_file" ] && _load_env && "$@"
     [ ! -e "$dc_file" ] && _load_env && _find_dc_and_retry "$@"
