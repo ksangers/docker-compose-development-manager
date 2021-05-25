@@ -56,7 +56,7 @@ run() {
     *) echo "Error: Unknown machine type" && exit 1 ;;
     esac
     export HOST_IP
-    if [[ "$SSH_AUTH_SOCK" == "" ]]; then
+    if [[ "${SSH_AUTH_SOCK:-}" == "" ]]; then
       readonly SSH_AUTH_SOCK="/tmp/.ssh-sock"
       ssh-agent -a "$SSH_AUTH_SOCK" &>/dev/null
     fi
@@ -244,6 +244,7 @@ set -e
     cd "$self_path" >/dev/null
     git pull origin "$(git branch --show-current)" &>/dev/null
     chmod +x "$self_bin"
+    return
   }
   # shellcheck disable=SC2120
   up() {
@@ -264,9 +265,8 @@ set -e
   if _in_array "${1:-}" $global_actions; then "$@" && return || exit $?; fi
   if [ "$(type -t "${1:-}")" == "function" ]; then
     for dc_file in docker-compose.y{a,}ml; do [ -e "$dc_file" ] && break; done
-    [ -e "$dc_file" ] && _load_env && "$@"
-    [ ! -e "$dc_file" ] && _load_env && _find_dc_and_retry "$@"
-    return
+    [ -e "$dc_file" ] && _load_env && "$@" && return || exit $?
+    [ ! -e "$dc_file" ] && _load_env && _find_dc_and_retry "$@" && return || exit $?
   else
     source "$(dirname "$(realpath "$0")")/help" && help "$@" && return 1
   fi
