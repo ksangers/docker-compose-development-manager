@@ -22,12 +22,13 @@ run() {
   _find_dc_and_retry() {
     local path="$pwd"
     while [[ $path != / ]]; do
+      path="$(readlink -f "$path"/..)"
       for dc_file in docker-compose.y{a,}ml; do if [ -e "$path/$dc_file" ]; then
         cd "$path"
+        pwd="$path"
         $self_bin "$@"
         exit $?
       fi; done
-      path="$(readlink -f "$path"/..)"
     done
   }
   _in_array() {
@@ -37,6 +38,7 @@ run() {
     return 1
   }
   _load_env() {
+    [ -n "${pwd:-}" ] && return 0
     case "$(uname -s | tr '[:upper:]' '[:lower:]')" in
     linux*) local machine=linux ;;
     darwin*) local machine=macos ;;
@@ -73,7 +75,7 @@ run() {
     export CUID CGID CHOME
     readonly self_bin="$(realpath "$0")"
     readonly self_path="$(dirname "$self_bin")"
-    readonly pwd="$(pwd)"
+    pwd="$(pwd)"
     readonly traefik_path="$self_path/traefik"
     readonly traefik_dc="$traefik_path/docker-compose.yaml"
     readonly cache_dir="$HOME/.cache/development-manager-docker-compose"
@@ -173,7 +175,7 @@ run() {
   }
   dc() {
     $DC "$@"
-    return $?
+    return
   }
   # shellcheck disable=SC2120
   down() {
@@ -191,7 +193,7 @@ run() {
       break
     fi; done
     _publish_hosts
-    return $?
+    return
   }
   help() {
     source "$(dirname "$(realpath "$0")")/help"
@@ -262,11 +264,12 @@ set -e
   if _in_array "${1:-}" $dc_proxy; then _load_env && "$@" && return || exit $?; fi
   local global_actions=(dc help init self_update)
   readonly global_actions
-  if _in_array "${1:-}" $global_actions; then "$@" && return || exit $?; fi
+  if _in_array "${1:-}" $global_actions; then echo 123 && "$@" && return || exit $?; fi
   if [ "$(type -t "${1:-}")" == "function" ]; then
     for dc_file in docker-compose.y{a,}ml; do [ -e "$dc_file" ] && break; done
-    [ -e "$dc_file" ] && _load_env && "$@" && return || exit $?
-    [ ! -e "$dc_file" ] && _load_env && _find_dc_and_retry "$@" && return || exit $?
+    [ -e "$dc_file" ] && _load_env && "$@" && return 
+    [ ! -e "$dc_file" ] && _load_env && _find_dc_and_retry "$@" && return
+    return
   else
     source "$(dirname "$(realpath "$0")")/help" && help "$@" && return 1
   fi
