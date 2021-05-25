@@ -64,7 +64,7 @@ help() {
     echo "Usage: $0 up [options...]"
     echo "For more info, see: docker-compose help up"
   }
-  if [ "$(type -t "$1")" == "function" ]; then "$@"; else
+  if [ "$(type -t "${1:-}")" == "function" ]; then "$@"; else
     echo "Usage: $0 <option>"
     echo "The following options are available."
     echo
