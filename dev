@@ -243,9 +243,9 @@ set -e
     return
   }
   self_update() {
-    cd "$self_path" >/dev/null
+    cd "$(dirname "$(realpath "$0")")" >/dev/null
     git pull origin "$(git branch --show-current)" &>/dev/null
-    chmod +x "$self_bin"
+    chmod +x "$(basename "$(realpath "$0")")"
     return
   }
   # shellcheck disable=SC2120
