@@ -227,14 +227,16 @@ run() {
     return 1
   }
   ps() {
+    local cache_dir="$HOME/.cache/development-manager-docker-compose"
+    local cache_kl="$cache_dir/known_locations"
     for arg; do if [ "$arg" == "-a" ]; then
       while read -r i; do for dc_file in docker-compose.y{a,}ml; do
-        [ -e "$i/$dc_file" ] && cd "$i" && $self_bin ps && break
+        [ -e "$i/$dc_file" ] && cd "$i" && echo && echo -e '\E[32m'"\033[1m$i \033[0m" && $(realpath "$0") ps && break
       done; done <"$cache_kl"
       return
     fi; done
 set -e
-    for dc_file in docker-compose.y{a,}ml; do [ -e "$dc_file" ] && $DC ps "$@" && break; done
+    for dc_file in docker-compose.y{a,}ml; do [ -e "$dc_file" ] && $(realpath "$0") dc ps "$@" && break; done
     return
   }
   restart() {
@@ -262,7 +264,7 @@ set -e
   local dc_proxy=(build exec logs pull run)
   readonly dc_proxy
   if _in_array "${1:-}" "${dc_proxy[@]}"; then _load_env && _find_dc_and_try $DC "$@" && return || exit $?; fi
-  local global_actions=(help init self_update)
+  local global_actions=(help init self_update ps)
   readonly global_actions
   if _in_array "${1:-}" "${global_actions[@]}"; then "$@" && return || exit $?; fi
   if [ "$(type -t "${1:-}")" == "function" ]; then _load_env && _find_dc_and_try "$@" && return || exit $?
