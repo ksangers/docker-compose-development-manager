@@ -15,7 +15,7 @@ fi
 run() {
   _auto_update() {
     touch -d '-16 hours' "$cache_lc"
-    [ "$cache_lc" -nt "$cache_pi" ] && touch "$cache_pi" && pull
+    [ "$cache_lc" -nt "$cache_pi" ] && touch "$cache_pi" && $(realpath "$0") pull
     [ "$cache_lc" -nt "$cache_su" ] && touch "$cache_su" && self_update && check
     return 0
   }
