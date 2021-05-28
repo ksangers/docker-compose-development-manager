@@ -12,19 +12,19 @@ if [ -e /proc/1/cgroup ] && ! head -n1 /proc/1/sched | grep -qce '\(init\|system
   exit 1
 fi
 
-run() {
+_dev() {
   local cache_dir cache_lc cache_su cache_kl cache_ae cache_ph cache_ne \
     cache_pi env self_bin self_path pwd traefik_path traefik_dc load_env \
     dc machine dc_file
   readonly env=dev
   readonly self_bin="$(realpath "$0")"
   readonly self_path="$(dirname "$self_bin")"
+  readonly help_bin="$self_path/help"
   pwd="$(pwd)"
   readonly traefik_path="$self_path/traefik"
   readonly traefik_dc="$traefik_path/docker-compose.yaml"
   PWD="$pwd"
   export PWD
-  source "$self_path/help"
   _auto_update() {
     _load_cache
     touch -d '-16 hours' "$cache_lc"
@@ -33,13 +33,21 @@ run() {
     return 0
   }
   _find_dc_and_try() {
-    local path="$pwd"
+    [ -z "${1:-}" ] && "$help_bin" && exit 0
+    _load_dc
+    local path="$pwd" r
     while [ "$path" != "/" ]; do
       pwd="$path"
       if _is_dc; then
         cd "$path"
-        "$@"
-        exit $?
+        if [ "$(type -t "${1:-}")" == "function" ]; then
+          "$@"
+          exit $?
+        fi
+        "$@" 2>/dev/null
+        r=$?
+        [ "$r" -gt 0 ] && "$help_bin" "$1"
+        exit $r
       fi
       path="$(readlink -f "$path"/..)"
     done
@@ -163,16 +171,17 @@ run() {
       -e "s|^\($s\)\($w\)$s:$s[\"']\(.*\)[\"']$s\$|\1$fs\2$fs\3|p" \
       -e "s|^\($s\)\($w\)$s:$s\(.*\)$s\$|\1$fs\2$fs\3|p" "$1" |
       awk -F"$fs" '{
-      indent = length($1)/2;
-      vname[indent] = $2;
-      for (i in vname) {if (i > indent) {delete vname[i]}}
-      if (length($3) > 0) {
-        vn=""; for (i=0; i<indent; i++) {vn=(vn)(vname[i])("_")}
-        sub(/-/, "_", vn)
-        sub(/-/, "_", $2)
-        printf("%s%s%s=\"%s\"\n", "'"$prefix"'",vn, $2, $3);
-      }
-    }' | tr '`' '"' | sed 's/"\([a-z0-9\-\.][a-z0-9\-\.]*\)"/\\"\1\\"/g'
+        indent = length($1)/2;
+        vname[indent] = $2;
+        for (i in vname) {if (i > indent) {delete vname[i]}}
+        if (length($3) > 0) {
+          vn=""; for (i=0; i<indent; i++) {vn=(vn)(vname[i])("_")}
+          sub(/-/, "_", vn)
+          sub(/-/, "_", $2)
+          printf("%s%s%s=\"%s\"\n", "'"$prefix"'",vn, $2, $3);
+        }
+      }' | tr '`' '"' | sed 's/"\([a-z0-9\-\.][a-z0-9\-\.]*\)"/\\"\1\\"/g' |
+      sed '/^..*=/{s/-/_/g;}'
   }
   _publish_hosts() {
     # shellcheck disable=SC2001
@@ -188,9 +197,11 @@ run() {
       # shellcheck source=/dev/null
       [ -e "$cache_ph" ] && source "$cache_ph"
     fi
-    return
+    return 0
   }
   _start_traefik() {
+    _load_cache
+    _load_dc
     if ! grep -qxF "$traefik_path" "$cache_ae"; then
       $dc -f "$traefik_dc" up -d
       echo "$traefik_path" >>"$cache_ae"
@@ -198,6 +209,8 @@ run() {
     return
   }
   _stop_traefik() {
+    _load_cache
+    _load_dc
     if grep -qxF "$traefik_path" "$cache_ae"; then
       $dc -f "$traefik_dc" down
       grep -xFv "$traefik_path" "$cache_ae" >"$cache_ne" || touch "$cache_ne"
@@ -205,11 +218,16 @@ run() {
     fi
     return
   }
-  attach() { _load_dc && $dc up "$1" && return; }
+  attach() {
+    _load_dc
+    $dc up "${1:-}" && return
+    help attach
+    return 1
+  }
   check() {
-    _is_dc || return 1
+    _is_dc || _find_dc_and_try check || return 1
+    _load_vars;_load_user;_load_network
     eval "$(_parse_yaml "$dc_file" "dc_")"
-    echo $dc_file
     [ -z "${dc_x_custom_type:-}" ] && return 0
     for dc_latest in "$self_path/templates/$dc_x_custom_type"/docker-compose.y{a,}ml; do [ -e "$dc_latest" ] && break; done
     if [ -n "$dc_x_custom_type" ] && [ -e "$dc_latest" ]; then
@@ -223,88 +241,69 @@ run() {
     return 0
   }
   dc() {
-    $dc "$@"
+    _load_dc
+    _is_dc && $dc "$@"
+    ! _is_dc && _find_dc_and_try dc "$@"
     return
   }
   # shellcheck disable=SC2120
   down() {
-    for arg; do if [ "$arg" == "-a" ]; then
-      echo "$cache_kl"
-      local cache_dir="$HOME/.cache/development-manager-docker-compose"
-      local cache_kl="$cache_dir/known_locations"
-      while read -r i; do for dc_file in docker-compose.y{a,}ml; do
-        [ -e "$i/$dc_file" ] && cd "$i" && $self_bin down && break
-      done; done <"$cache_kl"
-      return
-    fi; done
-    for dc_file in docker-compose.y{a,}ml; do if [ -e "$dc_file" ]; then
+    _load_dc
+    _load_cache
+    if _in_array "-a" "$@"; then
+      while read -r pwd; do cd "$pwd" && _is_dc && "$self_bin" down; done <"$cache_kl"
+      exit 0
+    elif _is_dc; then
       $dc down "$@"
       grep -xFv "$pwd" "$cache_ae" >"$cache_ne" || true
       cp "$cache_ne" "$cache_ae"
       grep -xFvcq "$traefik_path" "$cache_ae" || _stop_traefik
-      break
-    fi; done
-    _publish_hosts
-    return
+      _publish_hosts
+      return 0
+    fi
+    _find_dc_and_try down "$@" && return 0
+    help down
+    return 1
   }
   help() {
-    source "$(dirname "$(realpath "$0")")/help"
+    "$help_bin" "$@"
     return 0
   }
   # shellcheck disable=SC2120
   init() {
-    local force=0
     local type=""
-    for option in "$@"; do case "$option" in
-      -f | --force) force=1 ;;
-      *) if [ "$type" == "" ]; then type="$option"; fi ;;
-      esac done
-    if [ "$type" == "" ]; then
-      echo "Error: Type not given"
-      help init
-      exit 1
-    fi
-    if [ ! -e "$self_path"/templates/"$type" ]; then
-      echo "Error: Type '$type' not found."
-      exit 1
-    fi
-    if [ ! -e "$pwd/docker-compose.yml" ] && [ ! -e "$pwd/docker-compose.yaml" ] || [ "$force" == "1" ]; then
-      cp -prf "$self_path"/templates/"$type"/{,.[!.]}* "$pwd"
-      return
-    elif [ -e "$pwd/docker-compose.yml" ] || [ -e "$pwd/docker-compose.yaml" ]; then
-      echo "Warning: Project already initialized. Use --force to re-initialize the project"
-      return 1
-    fi
-    run help init
-    return 1
+    for type; do if [ -e "$self_path/templates/$type" ]; then break; else type=""; fi; done
+    [ "$type" == "" ] && echo "Error: No valid type supplied" && "$help_bin" init && exit 1
+    _is_dc && ! _in_array "-f" "$@" && ! _in_array "--force" "$@" && echo "Warning: Project already initialized. Use --force to re-initialize the project" && exit 1
+    cp -prf "$self_path"/templates/"$type"/{,.[!.]}* "$pwd"
+    return
   }
   ps() {
     _load_cache
-    for arg; do if [ "$arg" == "-a" ]; then
-      while read -r i; do for dc_file in docker-compose.y{a,}ml; do
-        [ -e "$i/$dc_file" ] && cd "$i" && echo && echo -e '\E[32m'"\033[1m$i \033[0m" && $(realpath "$0") ps && break
-      done; done <"$cache_kl"
-      return
-    fi; done
-    for dc_file in docker-compose.y{a,}ml; do [ -e "$dc_file" ] && $(realpath "$0") dc ps "$@" && return 0; done
+    if _in_array "-a" "$@"; then
+      while read -r pwd; do cd "$pwd" && _is_dc && echo && echo -e '\E[32m'"\033[1m$pwd \033[0m" && "$self_bin" ps; done <"$cache_kl"
+      exit $?
+    fi
+    _is_dc && "$self_bin" dc ps "$@" && return
+    _find_dc_and_try dc ps "$@" && return
     return 1
   }
   restart() {
-    $self_bin down "$@"
-    $self_bin up "$@"
+    "$self_bin" down "$@" && "$self_bin" up "$@"
     return
   }
   self_update() {
-    cd "$(dirname "$(realpath "$0")")" >/dev/null
-    git pull origin "$(git branch --show-current)" &>/dev/null
+    cd "$self_path" >/dev/null
+    echo 1
+    git pull origin "$(git branch --show-current)"
+    echo 1
     chmod +x "$(basename "$(realpath "$0")")"
+    echo 1
     return
   }
-  # shellcheck disable=SC2120
   up() {
     _auto_update
-    for dc_file in docker-compose.y{a,}ml; do [ -e "$dc_file" ] && break; done
-    [ ! -e "$dc_file" ] && return 1
+    ! _is_dc && _find_dc_and_try up "$@" && return 1
     grep -Eq "[^#]*traefik" "$dc_file" && _start_traefik
     grep -qxF "$pwd" "$cache_kl" &>/dev/null || echo "$pwd" >>"$cache_kl"
     $dc up -d "$@"
@@ -314,14 +313,8 @@ run() {
   }
   local dc_proxy=(build exec logs pull run)
   readonly dc_proxy
-  # shellcheck disable=SC2086
-  if _in_array "${1:-}" "${dc_proxy[@]}"; then _load_env && _find_dc_and_try $dc "$@" && return || exit $?; fi
-  local global_actions=(help init self_update ps)
-  readonly global_actions
-  if _in_array "${1:-}" "${global_actions[@]}"; then "$@" && return || _find_dc_and_try "$@" && return || exit $?; fi
-  if [ "$(type -t "${1:-}")" == "function" ]; then
-    # shellcheck disable=SC2086
-    _load_env && "$@" && return || _find_dc_and_try "$@" && return || exit $?
-  else source "$(dirname "$(realpath "$0")")/help" && help "$@" && return 1 || exit $?; fi
+  if _in_array "${1:-}" "${dc_proxy[@]}"; then dc "$@" && return; "$help_bin" "$1" && exit 1; fi
+  if [ -n "${1:-}" ]; then "$@"; else "$help_bin"; fi
+  exit $?
 }
-run "$@" && exit $?
+_dev "$@"; exit $?
