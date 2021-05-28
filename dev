@@ -294,11 +294,8 @@ _dev() {
   }
   self_update() {
     cd "$self_path" >/dev/null
-    echo 1
-    git pull origin "$(git branch --show-current)"
-    echo 1
+    git pull --quiet origin "$(git branch --show-current)"
     chmod +x "$(basename "$(realpath "$0")")"
-    echo 1
     return
   }
   up() {
