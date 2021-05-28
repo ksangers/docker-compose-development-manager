@@ -1,71 +1,81 @@
 #!/usr/bin/env bash
-help() {
+_help() {
   attach() {
     echo "Start and attach to a service container its output"
-    echo "Usage: $0 attach <container-name>"
+    echo "Usage: dev attach <container-name>"
+  } 
+  build() {
+    echo "Build docker images that are defined in the docker compose file."
+    echo "Usage: dev build"
   }
   check() {
     echo "Check whether the currently used template is up-to-date."
-    echo "Usage: $0 check [-v]"
+    echo "Usage: dev check [-v]"
     echo "Options:"
     echo "  -v  Verbose output"
   }
   dc() {
     echo "Execute a Docker Compose command directly, using configured .env* files."
-    echo "Usage: $0 dc [options...]"
+    echo "Usage: dev dc [options...]"
   }
   down() {
     echo "Turn off development environment."
-    echo "Usage: $0 down [options...]"
+    echo "Usage: dev down [-a] [options...]"
+    echo "Options:"
+    echo "  -a  Turn off all development environments"
     echo "For more info, see: docker-compose help down"
   }
   exec() {
     echo "Execute a command on a running service container"
-    echo "Usage: $0 exec <container> <command> [options...]"
-    echo "Example: $0 exec redis redis-cli flushall"
+    echo "Usage: dev exec <container> <command> [options...]"
+    echo "Example: dev exec redis redis-cli flushall"
     echo "For more info, see: docker-compose help exec"
   }
   init() {
     echo "Initialize a project type for development."
-    echo "Usage: $0 init [-f|--force] <project-type>"
+    echo "Usage: dev init [-f|--force] <project-type>"
     echo "Available project types: "
-    for type in "$(dirname "$(realpath "$0")")"/templates/*; do echo "- $(basename "$type")"; done
+    for type in $(find "$(dirname "$(realpath "$0")")/templates/" -mindepth 1 -maxdepth 1 -type d); do echo "- $(basename "$type")"; done
   }
   logs() {
     echo "Display container output logs."
-    echo "Usage: $0 logs [-f] [service]"
+    echo "Usage: dev logs [-f] [service]"
     echo "For more info, see: docker-compose help logs"
   }
   ps() {
     echo "Display status of service containers"
-    echo "Usage: $0 ps"
+    echo "Usage: dev ps"
     echo "For more info, see: docker-compose help ps"
   }
   pull() {
     echo "Pull latest development environment images."
-    echo "Usage: $0 pull"
+    echo "Usage: dev pull"
     echo "For more info, see: docker-compose help pull"
   }
   restart() {
     echo "Restart the environment."
-    echo "Usage: $0 restart"
+    echo "Usage: dev restart"
   }
   run() {
     echo "Run a command on a temporary service container."
-    echo "Usage: $0 run <service> <command>"
+    echo "Usage: dev run <service> <command>"
     echo "For more info, see: docker-compose help run"
   }
   self_update() {
     echo "Run self update."
-    echo "Usage: $0 self_update"
+    echo "Usage: dev self_update"
   }
   up() {
     echo "Turn on development environment."
-    echo "Usage: $0 up [options...]"
+    echo "Usage: dev up [options...]"
     echo "For more info, see: docker-compose help up"
   }
-  if [ "$(type -t "${1:-}")" == "function" ]; then "$@"; else
-    echo "Usage: $0 <option>"
+  "$1"
+  return 
+}
+
+if ! _help "$@"; then
+    echo "Usage: dev <option>"
     echo "The following options are available."
     echo
     echo "General management"
@@ -90,6 +100,4 @@ help() {
     echo "Additional options"
     echo "  dc: Execute a Docker Compose command"
     echo "  help: Display information about an option"
-  fi
-}
-
+fi
