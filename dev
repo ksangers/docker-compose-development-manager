@@ -13,17 +13,17 @@ if [ -e /proc/1/cgroup ] && ! head -n1 /proc/1/sched | grep -qce '\(init\|system
 fi
 
 _dev() {
-  local cache_dir cache_lc cache_su cache_kl cache_ae cache_ph cache_ne \
-    cache_pi env self_bin self_path pwd traefik_path traefik_dc load_env \
-    dc machine dc_file
-  readonly env=dev
-  readonly self_bin="$(realpath "$0")"
-  readonly self_path="$(dirname "$self_bin")"
-  readonly help_bin="$self_path/help"
+  local dc cache_dir cache_lc cache_su cache_kl cache_ae cache_ph cache_pi \
+    env self_bin self_path pwd traefik_path traefik_dc machine dc_file
+  env=dev
   pwd="$(pwd)"
-  readonly traefik_path="$self_path/traefik"
-  readonly traefik_dc="$traefik_path/docker-compose.yaml"
   PWD="$pwd"
+  self_bin="$(realpath "$0")"
+  self_path="$(dirname "$self_bin")"
+  traefik_path="$self_path/traefik"
+  traefik_dc="$traefik_path/docker-compose.yaml"
+  help_bin="$self_path/help"
+  readonly env self_bin self_path traefik_path traefik_dc help_bin
   export PWD
   _auto_update() {
     _load_cache
@@ -32,29 +32,41 @@ _dev() {
     [ "$cache_lc" -nt "$cache_su" ] && touch "$cache_su" && self_update && check
     return 0
   }
+  _cache_add() {
+    [ -n "${1:-}" ] && [ -n "${2:-}" ] || exit 1
+    local path="$pwd"
+    [ -n "${3:-}" ] && path="$3"
+    _load_cache
+    ! grep -cqxF "$2" "$1" && echo "$path" >>"$1"
+    return 0
+  }
+  _cache_exists() {
+    [ -n "${1:-}" ] && [ -n "${2:-}" ] || exit 1
+    grep -cqxF "$2" "$1" || return 1
+  }
+  _cache_del() {
+    [ -n "${1:-}" ] && [ -n "${2:-}" ] || exit 1
+    _load_cache
+    local filtered
+    filtered="$(grep -xvF "$2" "$1")"
+    echo "$filtered" | grep . >"$1"
+    return
+  }
   _find_dc_and_try() {
-    [ -z "${1:-}" ] && "$help_bin" && exit 0
+    [ -z "${1:-}" ] && exit 0
     _load_dc
-    local path="$pwd" r
-    while [ "$path" != "/" ]; do
-      pwd="$path"
+    while [ "$pwd" != "/" ]; do
       if _is_dc; then
-        cd "$path"
-        if [ "$(type -t "${1:-}")" == "function" ]; then
-          "$@"
-          exit $?
-        fi
-        "$@" 2>/dev/null
-        r=$?
-        [ "$r" -gt 0 ] && "$help_bin" "$1"
-        exit $r
+        cd "$pwd"
+        "$self_bin" "$@" || true
+        return
       fi
-      path="$(readlink -f "$path"/..)"
+      pwd="$(readlink -f "$pwd"/..)"
     done
-    echo "Error: No docker compose file found"
-    return 1
+    echo "Error: No docker compose file found" && return 1
   }
   _in_array() {
+    [ -n "${1:-}" ] || exit 1
     local a v="$1"
     shift
     for a; do [ "$a" == "$v" ] && return 0; done
@@ -75,7 +87,6 @@ _dev() {
     caches[cache_kl]="known_locations"
     caches[cache_ae]="active_environments"
     caches[cache_ph]="published_hosts"
-    caches[cache_ne]="new_environments"
     caches[cache_pi]="project_id_$(echo "$pwd" | base64)"
     for key in "${!caches[@]}"; do
       [ -z "${!key:-}" ] && eval "$key=\"$cache_dir/${caches[$key]}\""
@@ -98,19 +109,6 @@ _dev() {
       echo "Error: Required tools are missing, run: brew install coreutils"
       exit 1
     fi
-    return 0
-  }
-  _load_env() {
-    [ -n "${load_env:-}" ] && return 0
-    _load_machine
-    _load_dependencies
-    _load_user
-    _load_ssh_sock
-    _load_dc
-    _load_cache
-    _load_vars
-    _load_network
-    load_env=1
     return 0
   }
   _load_machine() {
@@ -184,39 +182,60 @@ _dev() {
       sed '/^..*=/{s/-/_/g;}'
   }
   _publish_hosts() {
+    _load_cache
     # shellcheck disable=SC2001
     while read -r line; do kill "$(/bin/ps -ao pid,cmd | grep -Po "[0-9]+ (?=$(echo "$line" | sed 's/\./\\\./g'))")" 2>/dev/null || true; done <"$cache_ph"
     touch "$cache_ph"
+    local publish_hosts
     if [ "$(wc -l <"$cache_ae")" != "0" ]; then
       # shellcheck disable=SC2046
-      docker inspect \
+      publish_hosts="$(docker inspect \
         -f '{{if .Config.Labels.dev_domain}}{{.Config.Labels.dev_domain}} {{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}{{end}}' \
         $(docker ps -aq) |
         grep -E '^[a-z0-9\-\.]+ [0-9\.]+$' |
-        xargs --max-lines=1 --no-run-if-empty echo "avahi-publish -a $line" >>"$cache_ph"
+        xargs --max-lines=1 --no-run-if-empty echo "avahi-publish -a $line")"
+      _cache_add "$cache_ph" "$publish_hosts"
       # shellcheck source=/dev/null
-      [ -e "$cache_ph" ] && source "$cache_ph"
+      source "$cache_ph"
+    fi
+    return 0
+  }
+  _run_on_all() {
+    [ -n "${1:-}" ] || exit 1
+    _load_cache
+    local cmd="$1" args=()
+    shift
+    if _in_array "-a" "$@"; then
+      for v; do if [ "$v" != "-a" ]; then args+=("$v"); fi; done
+      set -- "${args[@]}"
+      while read -r pwd; do
+        echo
+        echo -e '\E[32m'"\033[1m$pwd \033[0m"
+        cd "$pwd"
+        _find_dc_and_try "$cmd" "$@" || true
+      done <"$cache_kl"
+      exit 0
     fi
     return 0
   }
   _start_traefik() {
     _load_cache
     _load_dc
-    if ! grep -qxF "$traefik_path" "$cache_ae"; then
-      $dc -f "$traefik_dc" up -d
-      echo "$traefik_path" >>"$cache_ae"
+    if _is_dc && grep -cqE "[^#]*traefik" "$dc_file" && ! _cache_exists "$cache_ae" "$traefik_path"; then
+      $dc -f "$traefik_dc" up -d || true
+      _cache_add "$cache_ae" "$traefik_path" "$traefik_path"
+      _cache_add "$cache_kl" "$traefik_path" "$traefik_path"
     fi
-    return
+    return 0
   }
   _stop_traefik() {
     _load_cache
     _load_dc
-    if grep -qxF "$traefik_path" "$cache_ae"; then
-      $dc -f "$traefik_dc" down
-      grep -xFv "$traefik_path" "$cache_ae" >"$cache_ne" || touch "$cache_ne"
-      cp "$cache_ne" "$cache_ae"
+    if ! grep . "$cache_ae" | grep -cvxqF "$traefik_path" && _cache_exists "$cache_ae" "$traefik_path"; then
+      $dc -f "$traefik_dc" down || true
+      _cache_del "$cache_ae" "$traefik_path"
     fi
-    return
+    return 0
   }
   attach() {
     _load_dc
@@ -226,7 +245,9 @@ _dev() {
   }
   check() {
     _is_dc || _find_dc_and_try check || return 1
-    _load_vars;_load_user;_load_network
+    _load_vars
+    _load_user
+    _load_network
     eval "$(_parse_yaml "$dc_file" "dc_")"
     [ -z "${dc_x_custom_type:-}" ] && return 0
     for dc_latest in "$self_path/templates/$dc_x_custom_type"/docker-compose.y{a,}ml; do [ -e "$dc_latest" ] && break; done
@@ -246,18 +267,14 @@ _dev() {
     ! _is_dc && _find_dc_and_try dc "$@"
     return
   }
-  # shellcheck disable=SC2120
   down() {
     _load_dc
     _load_cache
-    if _in_array "-a" "$@"; then
-      while read -r pwd; do cd "$pwd" && _is_dc && "$self_bin" down; done <"$cache_kl"
-      exit 0
-    elif _is_dc; then
+    _run_on_all down "$@"
+    if _is_dc; then
       $dc down "$@"
-      grep -xFv "$pwd" "$cache_ae" >"$cache_ne" || true
-      cp "$cache_ne" "$cache_ae"
-      grep -xFvcq "$traefik_path" "$cache_ae" || _stop_traefik
+      _cache_del "$cache_ae" "$pwd"
+      _stop_traefik
       _publish_hosts
       return 0
     fi
@@ -274,16 +291,15 @@ _dev() {
     local type=""
     for type; do if [ -e "$self_path/templates/$type" ]; then break; else type=""; fi; done
     [ "$type" == "" ] && echo "Error: No valid type supplied" && "$help_bin" init && exit 1
-    _is_dc && ! _in_array "-f" "$@" && ! _in_array "--force" "$@" && echo "Warning: Project already initialized. Use --force to re-initialize the project" && exit 1
-    cp -prf "$self_path"/templates/"$type"/{,.[!.]}* "$pwd"
+    if _is_dc && ! _in_array "-f" "$@" && ! _in_array "--force" "$@"; then
+      echo "Warning: Project already initialized. Use --force to re-initialize the project" && exit 1
+    fi
+    eval 'cp -prf "$self_path"/templates/"$type"/{,.[!.]}* "$pwd"'
     return
   }
   ps() {
     _load_cache
-    if _in_array "-a" "$@"; then
-      while read -r pwd; do cd "$pwd" && _is_dc && echo && echo -e '\E[32m'"\033[1m$pwd \033[0m" && "$self_bin" ps; done <"$cache_kl"
-      exit $?
-    fi
+    _run_on_all ps "$@"
     _is_dc && "$self_bin" dc ps "$@" && return
     _find_dc_and_try dc ps "$@" && return
     return 1
@@ -293,7 +309,7 @@ _dev() {
     return
   }
   self_update() {
-    cd "$self_path" >/dev/null
+    cd "$self_path"
     git pull --quiet origin "$(git branch --show-current)"
     chmod +x "$(basename "$(realpath "$0")")"
     return
@@ -301,17 +317,21 @@ _dev() {
   up() {
     _auto_update
     ! _is_dc && _find_dc_and_try up "$@" && return 1
-    grep -Eq "[^#]*traefik" "$dc_file" && _start_traefik
-    grep -qxF "$pwd" "$cache_kl" &>/dev/null || echo "$pwd" >>"$cache_kl"
+    _start_traefik
+    _cache_add "$cache_kl" "$pwd"
     $dc up -d "$@"
-    grep -qxF "$pwd" "$cache_ae" &>/dev/null || echo "$pwd" >>"$cache_ae"
+    _cache_add "$cache_ae" "$pwd"
     ! grep -q "dev_domain=" "$dc_file" || _publish_hosts
     return
   }
   local dc_proxy=(build exec logs pull run)
   readonly dc_proxy
-  if _in_array "${1:-}" "${dc_proxy[@]}"; then dc "$@" && return; "$help_bin" "$1" && exit 1; fi
+  if _in_array "${1:-}" "${dc_proxy[@]}"; then
+    dc "$@" && return
+    "$help_bin" "$1" && exit 1
+  fi
   if [ -n "${1:-}" ]; then "$@"; else "$help_bin"; fi
   exit $?
 }
-_dev "$@"; exit $?
+_dev "$@"
+exit $?
