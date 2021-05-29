@@ -52,6 +52,25 @@ _dev() {
     echo "$filtered" | grep . >"$1"
     return
   }
+  _discover_and_add_additional_services() {
+    local ts_file="$pwd/templated-services.yaml" tsdc_file="$pwd/docker-compose.templated.yaml" vars id_vars template \
+      illegal_vars='^local (ts_file|pwd|tsdc_file|vars|id_vars|id|template)='
+    [ ! -e "$ts_file" ] && return 0
+    _load_cache
+    vars="$(_parse_yaml "$ts_file" "ts_" | grep -E "^ts_" | sed "s/^/local /g")"
+    for id in $(echo -e "$vars" | grep -E '^local ts_templates_[a-z0-9][a-z0-9]*_template=' | sed 's/^local ts_templates_\([a-z0-9][a-z0-9]*\)_template=.*$/\1/g'); do
+      id_vars="$(echo -e "$vars" | grep -E "^local ts_templates_${id}_environment_" | sed 's/^local ts_templates_\(\w\w*\)_environment_/local /g' | grep -vE "$illegal_vars")"
+      eval "$(echo -e "$vars" | grep -E "^local ts_templates_${id}_template=" | sed 's/^local ts_templates_\(\w\w*\)_template/local template/g')"
+      [ ! -e "$pwd/docker-compose.$template.tpl.yaml" ] && echo >&2 "Error: template docker-compose.$template.tpl.yaml not found" && exit 1
+      set -a
+      eval "$id_vars"
+      set +a
+      tsdc_file="$cache_dir/docker-compose.tsdc-$(echo -e "$id_vars-$template" | sha1sum | awk '{ print $1 }').yaml"
+      envsubst <"$pwd/docker-compose.$template.tpl.yaml" > "$tsdc_file"
+      echo -ne " -f $tsdc_file"
+    done
+    return 0
+  }
   _find_dc_and_try() {
     [ -z "${1:-}" ] && exit 0
     _load_dc
@@ -63,7 +82,7 @@ _dev() {
       fi
       pwd="$(readlink -f "$pwd"/..)"
     done
-    echo "Error: No docker compose file found" && return 1
+    echo >&2 "Error: No docker compose file found" && return 1
   }
   _in_array() {
     [ -n "${1:-}" ] || exit 1
@@ -106,7 +125,7 @@ _dev() {
     _load_machine
     if [ "$machine" == "macos" ]; then
       which gtouch >/dev/null && touch() { gtouch "$@"; } && return 0
-      echo "Error: Required tools are missing, run: brew install coreutils"
+      echo >&2 "Error: Required tools are missing, run: brew install coreutils"
       exit 1
     fi
     return 0
@@ -117,7 +136,7 @@ _dev() {
     linux*) machine=linux ;;
     darwin*) machine=macos ;;
     mingw*) machine=windows ;;
-    *) echo "Error: Unknown machine type" && exit 1 ;;
+    *) echo >&2 "Error: Unknown machine type" && exit 1 ;;
     esac
     readonly machine
     return 0
@@ -179,7 +198,7 @@ _dev() {
           printf("%s%s%s=\"%s\"\n", "'"$prefix"'",vn, $2, $3);
         }
       }' | tr '`' '"' | sed 's/"\([a-z0-9\-\.][a-z0-9\-\.]*\)"/\\"\1\\"/g' |
-      sed '/^..*=/{s/-/_/g;}'
+      sed '/^[^=]*=\\".*\\"$/{s/=\\"/="/;s/\\"$/"/;}'
   }
   _publish_hosts() {
     _load_cache
@@ -239,7 +258,7 @@ _dev() {
   }
   attach() {
     _load_dc
-    $dc up "${1:-}" && return
+    $dc -f "$dc_file" $(_discover_and_add_additional_services) up "${1:-}" && return
     help attach
     return 1
   }
@@ -248,11 +267,11 @@ _dev() {
     _load_vars
     _load_user
     _load_network
-    eval "$(_parse_yaml "$dc_file" "dc_")"
+    eval "$(_parse_yaml "$dc_file" "dc_" | grep -E "dc_")"
     [ -z "${dc_x_custom_type:-}" ] && return 0
     for dc_latest in "$self_path/templates/$dc_x_custom_type"/docker-compose.y{a,}ml; do [ -e "$dc_latest" ] && break; done
     if [ -n "$dc_x_custom_type" ] && [ -e "$dc_latest" ]; then
-      eval "$(_parse_yaml "$dc_latest" "dcl_")" &>/dev/null
+      eval "$(_parse_yaml "$dc_latest" "dcl_" | grep -E "dcl_")" &>/dev/null
       if [ -n "$dc_x_custom_version" ] || [ -n "$dcl_x_custom_version" ] && [ "$dcl_x_custom_version" != "$dc_x_custom_version" ]; then
         echo "The current docker template is outdated, run \"$(basename "$self_bin") init $dc_x_custom_type -f\" to update it."
         return 1
@@ -263,7 +282,7 @@ _dev() {
   }
   dc() {
     _load_dc
-    _is_dc && $dc "$@"
+    _is_dc && $dc -f "$dc_file" $(_discover_and_add_additional_services) "$@"
     ! _is_dc && _find_dc_and_try dc "$@"
     return
   }
@@ -272,7 +291,8 @@ _dev() {
     _load_cache
     _run_on_all down "$@"
     if _is_dc; then
-      $dc down "$@"
+      # shellcheck disable=SC2046
+      $dc -f "$dc_file" $(_discover_and_add_additional_services) down "$@"
       _cache_del "$cache_ae" "$pwd"
       _stop_traefik
       _publish_hosts
@@ -290,9 +310,9 @@ _dev() {
   init() {
     local type=""
     for type; do if [ -e "$self_path/templates/$type" ]; then break; else type=""; fi; done
-    [ "$type" == "" ] && echo "Error: No valid type supplied" && "$help_bin" init && exit 1
+    [ "$type" == "" ] && echo >&2 "Error: No valid type supplied" && "$help_bin" init && exit 1
     if _is_dc && ! _in_array "-f" "$@" && ! _in_array "--force" "$@"; then
-      echo "Warning: Project already initialized. Use --force to re-initialize the project" && exit 1
+      echo >&2 "Warning: Project already initialized. Use --force to re-initialize the project" && exit 1
     fi
     eval 'cp -prf "$self_path"/templates/"$type"/{,.[!.]}* "$pwd"'
     return
@@ -319,7 +339,8 @@ _dev() {
     ! _is_dc && _find_dc_and_try up "$@" && return 1
     _start_traefik
     _cache_add "$cache_kl" "$pwd"
-    $dc up -d "$@"
+    # shellcheck disable=SC2046
+    $dc -f "$dc_file" $(_discover_and_add_additional_services) up -d "$@"
     _cache_add "$cache_ae" "$pwd"
     ! grep -q "dev_domain=" "$dc_file" || _publish_hosts
     return
