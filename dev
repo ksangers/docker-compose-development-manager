@@ -66,7 +66,7 @@ _dev() {
       eval "$id_vars"
       set +a
       tsdc_file="$cache_dir/docker-compose.tsdc-$(echo -e "$id_vars-$template" | sha1sum | awk '{ print $1 }').yaml"
-      envsubst <"$pwd/docker-compose.$template.tpl.yaml" > "$tsdc_file"
+      envsubst <"$pwd/docker-compose.$template.tpl.yaml" >"$tsdc_file"
       echo -ne " -f $tsdc_file"
     done
     return 0
@@ -280,8 +280,11 @@ _dev() {
   }
   dc() {
     _load_dc
-    _is_dc && $dc -f "$dc_file" $(_discover_and_add_additional_services) "$@"
-    ! _is_dc && _find_dc_and_try dc "$@"
+    if _is_dc; then
+      $dc -f "$dc_file" $(_discover_and_add_additional_services) "$@"
+    else
+      _find_dc_and_try dc "$@"
+    fi
     return
   }
   down() {
@@ -318,8 +321,9 @@ _dev() {
   ps() {
     _load_cache
     _run_on_all ps "$@"
-    _is_dc && "$self_bin" dc ps "$@" && return
-    _find_dc_and_try dc ps "$@" && return
+    if _is_dc; then
+      "$self_bin" dc ps "$@"
+    else _find_dc_and_try dc ps "$@"; fi
     return 1
   }
   restart() {
@@ -335,13 +339,14 @@ _dev() {
   }
   up() {
     _auto_update
-    ! _is_dc && _find_dc_and_try up "$@" && return 1
-    _start_traefik
-    _cache_add "$cache_kl" "$pwd"
-    # shellcheck disable=SC2046
-    $dc -f "$dc_file" $(_discover_and_add_additional_services) up -d "$@"
-    _cache_add "$cache_ae" "$pwd"
-    ! grep -q "dev_domain=" "$dc_file" || _publish_hosts
+    if _is_dc; then
+      _start_traefik
+      _cache_add "$cache_kl" "$pwd"
+      # shellcheck disable=SC2046
+      $dc -f "$dc_file" $(_discover_and_add_additional_services) up -d "$@"
+      _cache_add "$cache_ae" "$pwd"
+      ! grep -q "dev_domain=" "$dc_file" || _publish_hosts
+    else _find_dc_and_try up "$@"; fi
     return
   }
   local dc_proxy=(build exec logs pull run)
@@ -349,8 +354,11 @@ _dev() {
   if _in_array "${1:-}" "${dc_proxy[@]}"; then
     dc "$@" && return
     "$help_bin" "$1" && exit 1
+  elif [ -n "${1:-}" ]; then
+    "$@"
+  else
+    "$help_bin"
   fi
-  if [ -n "${1:-}" ]; then "$@"; else "$help_bin"; fi
   exit $?
 }
 _dev "$@"
