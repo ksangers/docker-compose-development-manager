@@ -240,9 +240,8 @@ _dev() {
   _start_traefik() {
     _load_cache
     _load_dc
-    if _is_dc && grep -cqE "[^#]*traefik" "$dc_file" && ! _cache_exists "$cache_ae" "$traefik_path"; then
+    if _is_dc && grep -cqE "[^#]*traefik" "$dc_file"; then
       $dc -f "$traefik_dc" up -d || true
-      _cache_add "$cache_ae" "$traefik_path" "$traefik_path"
       _cache_add "$cache_kl" "$traefik_path" "$traefik_path"
     fi
     return 0
@@ -252,7 +251,6 @@ _dev() {
     _load_dc
     if ! grep . "$cache_ae" | grep -cvxqF "$traefik_path" && _cache_exists "$cache_ae" "$traefik_path"; then
       $dc -f "$traefik_dc" down || true
-      _cache_del "$cache_ae" "$traefik_path"
     fi
     return 0
   }
