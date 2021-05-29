@@ -352,8 +352,7 @@ _dev() {
   local dc_proxy=(build exec logs pull run)
   readonly dc_proxy
   if _in_array "${1:-}" "${dc_proxy[@]}"; then
-    dc "$@" && return
-    "$help_bin" "$1" && exit 1
+    dc "$@"
   elif [ -n "${1:-}" ]; then
     "$@"
   else
