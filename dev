@@ -149,7 +149,7 @@ _dev() {
     linux) readonly HOST_IP=$(ip -4 addr show docker0 | grep -Po 'inet \K[\d.]+') ;;
     esac
     export HOST_IP
-    if docker network list --format "{{.Name}}" | grep -xcq gateway; then
+    if ! docker network list --format "{{.Name}}" | grep -xcq gateway; then
       docker network create --driver=bridge --attachable --internal=false gateway &>/dev/null
     fi
     return 0
@@ -280,6 +280,7 @@ _dev() {
   }
   dc() {
     _load_dc
+    _load_network
     if _is_dc; then
       $dc -f "$dc_file" $(_discover_and_add_additional_services) "$@"
     else
@@ -290,6 +291,7 @@ _dev() {
   down() {
     _load_dc
     _load_cache
+    _load_network
     _run_on_all down "$@"
     if _is_dc; then
       # shellcheck disable=SC2046
@@ -338,6 +340,7 @@ _dev() {
     return
   }
   up() {
+    _load_network
     _auto_update
     if _is_dc; then
       _start_traefik
