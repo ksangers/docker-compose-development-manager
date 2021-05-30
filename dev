@@ -256,7 +256,7 @@ _dev() {
   }
   attach() {
     _load_dc
-    $dc -f "$dc_file" $(_discover_and_add_additional_services) up "${1:-}" && return
+    _is_dc && $dc -f "$dc_file" $(_discover_and_add_additional_services) up "${1:-}" && return
     help attach
     return 1
   }
