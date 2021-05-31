@@ -58,7 +58,7 @@ _dev() {
     [ ! -e "$ts_file" ] && return 0
     _load_cache
     vars="$(_parse_yaml "$ts_file" "ts_" | grep -E "^ts_" | sed "s/^/local /g")"
-    for id in $(echo -e "$vars" | grep -E '^local ts_templates_[a-z0-9][a-z0-9]*_template=' | sed 's/^local ts_templates_\([a-z0-9][a-z0-9]*\)_template=.*$/\1/g'); do
+    for id in $(echo -e "$vars" | grep -E '^local ts_templates_[a-z0-9_][a-z0-9_]*_template=' | sed 's/^local ts_templates_\([a-z0-9_][a-z0-9_]*\)_template=.*$/\1/g'); do
       id_vars="$(echo -e "$vars" | grep -E "^local ts_templates_${id}_environment_" | sed 's/^local ts_templates_\(\w\w*\)_environment_/local /g' | grep -vE "$illegal_vars")"
       eval "$(echo -e "$vars" | grep -E "^local ts_templates_${id}_template=" | sed 's/^local ts_templates_\(\w\w*\)_template/local template/g')"
       [ ! -e "$pwd/docker-compose.$template.tpl.yaml" ] && echo >&2 "Error: template docker-compose.$template.tpl.yaml not found" && exit 1
