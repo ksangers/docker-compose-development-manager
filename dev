@@ -48,8 +48,8 @@ _dev() {
     [ -n "${1:-}" ] && [ -n "${2:-}" ] || exit 1
     _load_cache
     local filtered
-    filtered="$(grep -xvF "$2" "$1")"
-    echo "$filtered" | grep . >"$1"
+    filtered="$(grep -xvF "$2" "$1" | grep .)"
+    echo -e "$filtered" >"$1"
     return
   }
   _discover_and_add_additional_services() {
@@ -249,7 +249,7 @@ _dev() {
   _stop_traefik() {
     _load_cache
     _load_dc
-    if ! grep . "$cache_ae" | grep -cvxqF "$traefik_path" && _cache_exists "$cache_ae" "$traefik_path"; then
+    if ! grep . "$cache_ae" | grep -cvxqF "$traefik_path"; then
       $dc -f "$traefik_dc" down || true
     fi
     return 0
