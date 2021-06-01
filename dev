@@ -48,8 +48,8 @@ _dev() {
     [ -n "${1:-}" ] && [ -n "${2:-}" ] || exit 1
     _load_cache
     local filtered
-    filtered="$(grep -xvF "$2" "$1")"
-    echo -e "$filtered" | grep . >"$1"
+    filtered="$(grep -xvF "$2" "$1" | grep . || cat "$1")"
+    echo -e "$filtered" >"$1"
     return
   }
   _discover_and_add_additional_services() {
