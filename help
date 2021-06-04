@@ -70,8 +70,13 @@ _help() {
     echo "Usage: dev up [options...]"
     echo "For more info, see: docker-compose help up"
   }
-  "$1"
-  return 
+  if [ "$(type -t "${1:-}")" == "function" ]; then
+    "${1:-}"
+    return 
+  else
+    echo Error: Option "${1:-}" not found
+    return 1
+  fi
 }
 
 if ! _help "$@"; then

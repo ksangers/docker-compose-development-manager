@@ -356,10 +356,10 @@ _dev() {
   readonly dc_proxy
   if _in_array "${1:-}" "${dc_proxy[@]}"; then
     dc "$@"
-  elif [ -n "${1:-}" ]; then
+  elif [ -n "${1:-}" ] && [ "$(type -t "${1:-}")" == "function" ]; then
     "$@"
   else
-    "$help_bin"
+    "$help_bin" "$@"
   fi
   exit $?
 }
