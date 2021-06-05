@@ -11,7 +11,7 @@ services:
       # Enable Docker provider
       - "--providers.docker=true"
       # Specify the network to route services from
-      - "--providers.docker.network=default"
+      - "--providers.docker.network=gateway"
       # Only expose explicitly defined services
       - "--providers.docker.exposedByDefault=true"
       # Set log level
