@@ -333,6 +333,11 @@ _dev() {
     "$self_bin" up "$@"
     return
   }
+  run_local() {
+    local run_path=$(pwd)
+    _find_dc_and_try dc run -v /home:/home -w "$run_path" "$@"
+    return 
+  }
   self_update() {
     cd "$self_path"
     git pull --quiet origin "$(git branch --show-current)"
